@@ -35,7 +35,7 @@ public class PvmSystem {
     PvmDataCore core;
     int baseCount;
 
-    GlobalSolver globalSolver = null;
+    IterativeGlobalSolver globalSolver = null;
 
     public boolean BuildSystemFor(PvmDataCore pvms, double t, boolean saveSys, boolean nameAllConstraints){
         cplex = null;
@@ -545,7 +545,7 @@ public class PvmSystem {
         List<String> blockModelFiles = modelBuilder.splitIntoBlockFiles( equationsPerBlock, true );
         String objectiveFile = modelBuilder.generateStartingPointFile(1.0);
 
-        globalSolver = new GlobalSolver(blockModelFiles, objectiveFile);
+        globalSolver = new IterativeGlobalSolver(blockModelFiles, objectiveFile);
 
         solveResult = globalSolver.runSolver(2000);
         if (solveResult == null)
