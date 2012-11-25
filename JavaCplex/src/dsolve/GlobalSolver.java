@@ -18,8 +18,10 @@ public class GlobalSolver {
 
 	private List<String> modelFileList;
 	private String       objectiveFile;
-    private double       distance2Objective;
+    private List<NamedCoordList> solutions = null;
+    private List<LocalSolver> localSolvers = null;
     private NamedCoordList objective = null;
+
 
     public static Logger logger = Logger.getLogger( GlobalSolver.class.getName() );
 
@@ -27,10 +29,6 @@ public class GlobalSolver {
 	 	this.modelFileList = modelFiles;
 		this.objectiveFile = objectiveFile;
 	}
-
-    public double getSolutionInfeasibility(){return distance2Objective;}
-
-    public NamedCoordList getGlobalSolution(){return objective;}
 
 	private NamedCoordList readCurrentObjective() throws IloException, IOException {
 		return LocalSolver.readObjectiveFromFile( objectiveFile );
@@ -61,54 +59,94 @@ public class GlobalSolver {
 		return newObj.rebuild();
 	}
 
-	public boolean runSolver( int maxIterCount ) throws IloException, IOException {
+    public NamedCoordList runSolver( int maxIterCount) throws IloException, IOException
+    {
+        return runSolver(maxIterCount, 1e-8);
+    }
 
-		List<NamedCoordList> solutions = new ArrayList<NamedCoordList>( modelFileList.size() );
-		List<LocalSolver> localSolvers = new ArrayList<LocalSolver>( modelFileList.size() );
+    private void initCurrentSolvers() throws IOException, IloException {
+        solutions = new ArrayList<NamedCoordList>( modelFileList.size() );
+        localSolvers = new ArrayList<LocalSolver>( modelFileList.size() );
+        objective = readCurrentObjective();
 
-		objective = readCurrentObjective();
+        logger.info( "Loading model files into local solvers" );
+        for ( String model: modelFileList ) {
+            logger.info( "loading model file: " + model );
 
-        distance2Objective = Double.MAX_VALUE;
+            LocalSolver solver = new LocalSolver();
+            solver.loadModelFromFile( model );
 
-		logger.info( "Loading model files into local solvers" );
-		for ( String model: modelFileList ) {
-			logger.info( "loading model file: " + model );
+            localSolvers.add( solver );
+        }
+    }
 
-			LocalSolver solver = new LocalSolver();
-			solver.loadModelFromFile( model );
+    private void reInitCurrentSolvers() throws IloException {
+        int i;
 
-			localSolvers.add( solver );
-		}
+        for (LocalSolver lSolver : localSolvers)
+            lSolver.reInit();
+    }
 
-		boolean systemIsStillFeasible = true;
-		int iterCount = 0;
-		while ( (iterCount < maxIterCount) && (distance2Objective >= 10e-8) ) {
+    private boolean iterateSolver(int maxIterCount, double feasibilityThreshold) throws IloException {
 
-			if ( !systemIsStillFeasible ) {
-				logger.warning( "global system in infeasible; aborting" );
-				return false;
-			}
+        double distance2Objective = Double.MAX_VALUE;
+        boolean systemIsStillFeasible = true;
+        int iterCount = 0;
 
-			solutions.clear();
+        while ( (iterCount < maxIterCount) && (distance2Objective >= feasibilityThreshold) ) {
 
-			for ( LocalSolver solver: localSolvers ) {
+            if ( !systemIsStillFeasible ) {
+                logger.warning( "global system in infeasible; aborting" );
+                return false;
+            }
 
-				solver.setTargetObjectivePoint( objective );
-				systemIsStillFeasible =  solver.runSolver();
+            solutions.clear();
 
-				if ( !systemIsStillFeasible ) { break; }
+            for ( LocalSolver solver: localSolvers ) {
 
-				solutions.add( solver.getSolution() );
-			}
+                solver.setTargetObjectivePoint( objective );
+                systemIsStillFeasible =  solver.runSolver();
 
-			distance2Objective = computeDistance( objective, solutions );
-			objective = adjustCurrentObjective( objective, solutions );
+                if ( !systemIsStillFeasible ) { break; }
 
-			iterCount ++;
-		}
+                solutions.add( solver.getSolution() );
+            }
 
-		return true;
+            objective = adjustCurrentObjective( objective, solutions );
+            distance2Objective = computeDistance( objective, solutions );
+
+            iterCount ++;
+        }
+
+        logger.info(String.format("Infeasibility bound: %f", distance2Objective));
+
+        if (!systemIsStillFeasible || distance2Objective >= feasibilityThreshold)
+            return false;
+
+        return true;
+    }
+
+	public NamedCoordList runSolver( int maxIterCount, double feasibilityThreshold) throws IloException, IOException {
+        initCurrentSolvers();
+
+        if (iterateSolver(maxIterCount, feasibilityThreshold))
+		    return objective;
+
+        return null;
 	}
+
+    public NamedCoordList reRunSolver(int maxIterCount) throws IloException, IOException {
+        return reRunSolver(maxIterCount, 1e-8);
+    }
+
+    public NamedCoordList reRunSolver(int maxIterCount, double feasibilityThreshold) throws IloException, IOException {
+        //reInitCurrentSolvers();
+
+        if (iterateSolver(maxIterCount, feasibilityThreshold))
+            return objective;
+
+        return null;
+    }
 
 	public double euclidianDist( NamedCoordList v1, NamedCoordList v2 ) {
 		double distance = 0;
@@ -134,4 +172,10 @@ public class GlobalSolver {
 		}
 		return distance;
 	}
+
+    public void replaceConstraint(String constraintName, String constraintNameNew, double lowerBound, double upperBound, NamedCoordList expr) throws IloException, LocalSolver.LocalSolverInputException
+    {
+        for (LocalSolver localSolver : localSolvers)
+            localSolver.replaceConstraint(constraintName, constraintNameNew, lowerBound, upperBound, expr);
+    }
 }
