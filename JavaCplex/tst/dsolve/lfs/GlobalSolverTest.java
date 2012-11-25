@@ -36,7 +36,7 @@ public class GlobalSolverTest {
 
 		GlobalSolver globalSolver = new GlobalSolver( blockModelFiles, objectiveFile );
 
-		Assert.assertTrue( "Localsolver didn't manage to solve the most simple system ever", globalSolver.runSolver( 200 ) );
+		Assert.assertTrue( "Localsolver didn't manage to solve the most simple system ever", globalSolver.runSolver( 200 ) != null );
 	}
 
 }
