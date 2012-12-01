@@ -53,7 +53,7 @@ public class PvmSystem {
 
         rngConstraints = new IloRange[baseCount * 2 + 2];
 
-        if (!CreateVariables())
+        if (!CreateVariables(true))
             return false;
 
         if (!AddSigmaRegularConstraints())
@@ -114,9 +114,16 @@ public class PvmSystem {
         return true;
     }
 
-    public boolean CreateVariables(){
+    public boolean CreateVariables()
+    {
+        return CreateVariables(true);
+    }
+    public boolean CreateVariables(boolean addHyperplaneOffsetVar){
         int i;
-        vars = new IloNumVar[baseCount * 2 + 1];
+        if (addHyperplaneOffsetVar)
+            vars = new IloNumVar[baseCount * 2 + 1];
+        else
+            vars = new IloNumVar[baseCount * 2];
 
         try
         {
@@ -127,7 +134,8 @@ public class PvmSystem {
                 vars[i + baseCount] = cplex.numVar(0, Double.MAX_VALUE, IloNumVarType.Float);
 
 
-            vars[2 * core.entries.size()] = cplex.numVar(-Double.MAX_VALUE, Double.MAX_VALUE, IloNumVarType.Float);
+            if (addHyperplaneOffsetVar)
+                vars[2 * core.entries.size()] = cplex.numVar(-Double.MAX_VALUE, Double.MAX_VALUE, IloNumVarType.Float);
         }
         catch(ilog.concert.IloException e)
         {
@@ -624,5 +632,94 @@ public class PvmSystem {
         return ret;
     }
 
+    private void setDenominatorUnityEqualityConstraint(int rngIdx) throws IloException {
+        int i;
+
+        IloLinearNumExpr lin;
+
+        lin = cplex.linearNumExpr();
+
+        for (i = 0; i < baseCount; i++)
+            lin.addTerm(core.kpos[i] - core.kneg[i], vars[i]);
+
+
+        rngConstraints[rngIdx] = cplex.addEq(1.0, lin, "UnityEq");
+    }
+
+    private void setSingleLPTypeObjective() throws IloException {
+        int i;
+        IloLinearNumExpr lin;
+        double posTerm = core.xNeg.length - 1, negTerm = core.xPos.length - 1;
+
+        assert(posTerm > 0 && negTerm > 0);
+
+        lin = cplex.linearNumExpr();
+        for (i = 0; i < core.xPos.length; i++)
+            lin.addTerm(posTerm, vars[core.xPos[i] + baseCount]);
+
+        for (i = 0; i < core.xNeg.length; i++)
+            lin.addTerm(negTerm, vars[core.xNeg[i] + baseCount]);
+
+        obj = cplex.addMinimize(lin);
+    }
+
+    public boolean buildSingleLPSystem(PvmDataCore pvms, boolean saveSys, boolean nameAllVars, boolean nameAllConstraints) throws IloException {
+        cplex = null;
+        try
+        {
+            cplex = new IloCplex();
+        }
+        catch (ilog.concert.IloException e)
+        {
+            return false;
+        }
+
+        core = pvms;
+        baseCount = core.entries.size();
+
+        rngConstraints = new IloRange[baseCount * 2 + 1];
+
+        if (!CreateVariables(false))
+            return false;
+
+        if (!AddSigmaRegularConstraints())
+            return false;
+
+        setDenominatorUnityEqualityConstraint(baseCount * 2);
+        setSingleLPTypeObjective();
+
+        if (nameAllVars)
+            setVariableNames();
+
+        if (nameAllConstraints)
+            SetConstraintsNames();
+
+        if (saveSys)
+            SaveModel();
+
+        return true;
+    }
+
+    public boolean solveSingleLP(double [] resT) throws IloException {
+
+        int i, sigIdx;
+
+        if (!cplex.solve())
+            return false;
+
+        assert (resT.length > 0);
+
+        double [] x = cplex.getValues(vars);
+
+        for (i = 0; i < baseCount; i++)
+            core.alphas[i] = x[i];
+
+        for (i = 0; i < baseCount; i++)
+            core.sigmas[i] = x[i + baseCount];
+
+        core.recomputeHyperplaneBias(resT);
+
+        return true;
+    }
 
 }

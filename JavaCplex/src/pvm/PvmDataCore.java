@@ -1,5 +1,7 @@
 package pvm;
 
+import util.RandomUtils;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
@@ -23,19 +25,30 @@ public class PvmDataCore {
     public static double doubleEps = 1e-10;
 
 
+    public PvmDataCore(){
+        entries = new ArrayList<PvmEntry>(0);
+    }
+
+    public PvmDataCore(int entriesCapacity){
+        entries = new ArrayList<PvmEntry>(entriesCapacity);
+    }
+
     public void ReadFile(String FileName) throws IOException {
         //String ss = "/work/cplex-pvm/dbs/mushroom/agaricus-lepiota.data.mean";
         entries = DatabaseLoader.loadEntries(FileName);
     }
 
     public void Init(){
+        Init(true);
+    }
+
+    public void Init(boolean computeGramMtx){
         alphas = new double[entries.size()];
         sigmas = new double[entries.size()];
         offsetB = 0;
 
         SortNegativeAndPositiveEntries();
         ComputeGramMatrix();
-
     }
 
     public void SortNegativeAndPositiveEntries(){
@@ -125,7 +138,7 @@ public class PvmDataCore {
         }
     }
 
-    public boolean CheckResult(double [] resT){
+    public boolean CheckResult(double [] resT, boolean useFixedAverageThresh){
         int i, j;
         double epos = offsetB, eneg = offsetB;
         double localDist, localSigma;
@@ -139,7 +152,10 @@ public class PvmDataCore {
         for (i = 0; i < kneg.length; i++)
             eneg += alphas[i] * kneg[i];
 
-        if (epos < 1.0 - doubleEps || -eneg < 1.0 - doubleEps)
+        if (useFixedAverageThresh && (epos < 1.0 - doubleEps || -eneg < 1.0 - doubleEps))
+            return false;
+
+        if (!useFixedAverageThresh && (epos < doubleEps || -eneg < doubleEps))
             return false;
 
         //then compute the deviation of the distance associated with each record and see if it checks out
@@ -187,4 +203,127 @@ public class PvmDataCore {
 
         return true;
     }
+
+    public void recomputeHyperplaneBias(double [] resT){
+        int i;
+        double sigmaPos = 0, sigmaNeg = 0, ksumPos = 0, ksumNeg = 0;
+
+        offsetB = 0.0;
+
+        assert(xPos.length > 1 && xNeg.length > 1);
+
+        for (i = 0; i < xPos.length; i++)
+            sigmaPos += sigmas[xPos[i]];
+
+        sigmaPos /= (double)(xPos.length - 1);
+
+        for (i = 0; i < xNeg.length; i++)
+            sigmaNeg += sigmas[xNeg[i]];
+
+        sigmaNeg /= (double)(xNeg.length - 1);
+
+        for (i = 0; i < alphas.length; i++)
+        {
+            ksumPos += alphas[i] * kpos[i];
+            ksumNeg += alphas[i] * kneg[i];
+        }
+
+        if (sigmaPos < doubleEps && sigmaNeg < doubleEps)
+            return;
+
+        offsetB = - (sigmaPos * ksumNeg + sigmaNeg * ksumPos) / (sigmaPos + sigmaNeg);
+
+        resT[0] = sigmaPos / (ksumPos + offsetB);
+    }
+
+    private int [] getLabelCopiesPos(){
+        int i;
+        int ret[] = new int[xPos.length];
+
+        for (i = 0; i < xPos.length; i++)
+            ret[i] = xPos[i];
+
+        return ret;
+    }
+    private int [] getLabelCopiesNeg(){
+        int i;
+        int ret[] = new int[xNeg.length];
+
+        for (i = 0; i < xNeg.length; i++)
+            ret[i] = xNeg[i];
+
+        return ret;
+    }
+
+    public ArrayList<PvmDataCore> splitRandomIntoSlices(int sliceCount){
+        //todo : do sliceCount data fold
+        int i;
+        int cxPos[], cxNeg[];
+        PvmDataCore cCore;
+        ArrayList<PvmDataCore> resCores = new ArrayList<PvmDataCore>(sliceCount);
+
+        resCores.clear();
+
+        if (sliceCount < 1)
+            return null;
+
+        for (i = 0; i < sliceCount; i++)
+            resCores.add(new PvmDataCore(1 + (entries.size() / sliceCount)));
+
+        cxPos = getLabelCopiesPos();
+        cxNeg = getLabelCopiesNeg();
+
+        RandomUtils.doShuffle(cxPos);
+        RandomUtils.doShuffle(cxNeg);
+
+        for (i = 0; i < cxPos.length; i++){
+            cCore = resCores.get(i % sliceCount);
+            cCore.entries.add(entries.get(cxPos[i]));
+        }
+
+        for (i = 0; i < cxNeg.length; i++){
+            cCore = resCores.get(i % sliceCount);
+            cCore.entries.add(entries.get(cxNeg[i]));
+        }
+
+        return resCores;
+    }
+
+    public static PvmDataCore mergeCores(ArrayList<PvmDataCore> srcCores){
+        //to do : merge all the cores into a single resulting core
+        int i, entriesCount = 0;
+        PvmDataCore resCore;
+
+        for (PvmDataCore cCore : srcCores)
+            entriesCount += cCore.entries.size();
+
+        if (entriesCount == 0)
+            return null;
+
+        resCore = new PvmDataCore(entriesCount);
+
+        for (PvmDataCore cCore : srcCores){
+            resCore.entries.addAll(cCore.entries);
+        }
+
+        return resCore;
+    }
+
+    public boolean classify(PvmEntry src){
+        int i;
+        double sum = offsetB;
+
+        assert (alphas.length == entries.size());
+
+        for (i = 0; i < alphas.length; i++)
+        {
+            if (alphas[i] == 0)
+                continue;
+
+            sum += alphas[i] * KerProduct.ComputeKerProd(src, entries.get(i));
+        }
+
+        return sum < 0 ? false : true;
+    }
+
 }
