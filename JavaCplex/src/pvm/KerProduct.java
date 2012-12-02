@@ -17,6 +17,12 @@ public class KerProduct {
     public static double paramD = 1.0;
     public static int paramI = 1;
 
+    private static int minParamI = 1;
+    private static int maxParamI = 7;
+    private static int minParamDExponent = -20;
+    private static int maxParamDExponent = -1;
+    private static int maxParamDSteps = 20;
+
     public static double ComputeKerProd(PvmEntry e0, PvmEntry e1)
     {
         switch (kerType)
@@ -26,6 +32,71 @@ public class KerProduct {
             case KERRBF: return ComputeKerProdRbf(e0, e1);
 
             default: return ComputeKerProdScalar(e0, e1);
+        }
+    }
+
+    public static int getMinParamI(){
+
+        switch (kerType){
+            case KERSCALAR: return 0;
+            case KERRBF: return 0;
+            case KERPOLY: return minParamI;
+
+            default: return minParamI;
+        }
+    }
+
+    public static int getMaxParamI(){
+        switch (kerType){
+            case KERSCALAR: return 0;
+            case KERRBF: return 0;
+            case KERPOLY: return maxParamI;
+
+            default: return maxParamI;
+        }
+    }
+
+    public static double getMinParamD(){
+        switch (kerType)
+        {
+            case KERPOLY: return 0;
+            case KERRBF: return Math.exp(-20);
+
+            default : return 0;
+        }
+    }
+
+    public static  double getMaxParamD(){
+        if (kerType == KerType.KERSCALAR)
+            return 0.0;
+
+        return 1.0;
+    }
+
+    public static int getParamDMaxStepsCount(){
+
+        switch(kerType){
+            case KERSCALAR: return 1;
+            case KERPOLY: return 4;
+            case KERRBF: return maxParamDSteps;
+
+            default: return 1;
+        }
+    }
+
+    public static double getParamDValue(int cStep, int maxSteps){
+
+        if (kerType == KerType.KERSCALAR)
+            return 0.0;
+
+        assert(maxSteps > 1 && cStep >= 0 && cStep < maxSteps);
+        double r = (double)(cStep) / (double)(maxSteps - 1);
+
+        switch (kerType){
+            case KERPOLY: return r;
+            case KERRBF: return Math.exp(minParamDExponent + r * (maxParamDExponent - minParamDExponent));
+
+            default: return r;
         }
     }
 

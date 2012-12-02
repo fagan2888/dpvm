@@ -101,6 +101,13 @@ public class PvmSolver {
         pvmSys.buildSingleLPSystem(core, false, false, false);
         ret = pvmSys.solveSingleLP(resT);
 
+        if (ret && resT[0] == 0.0)
+        {
+            pvmSys.buildSecondaryLpSystem(core);
+            ret = pvmSys.solveSingleLPSecondary(resT);
+            //ret = pvmSys.solveSingleLP(resT);
+        }
+
         assert(core.CheckResult(resT, false));
         return ret;
     }
@@ -208,6 +215,57 @@ public class PvmSolver {
         return;
     }
 
+    public void searchKernel(int splitCount) throws IloException {
+
+        int i, last_i;
+        KerProduct.KerType bestKerType = KerProduct.KerType.KERSCALAR;
+        double bestParamD = 0.0;
+        int bestParamI = 0;
+
+        double tempParamD;
+        int tempParamI;
+
+        double bestAcc = 0.0;
+
+        double tempAccuracy[] = new double[1];
+        double tempSensitivity[] = new double[1];
+        double tempSpecificity[] = new double[1];
+
+
+        //for (KerProduct.KerType kerType : KerProduct.KerType.values())
+        {
+            KerProduct.KerType kerType = KerProduct.KerType.KERRBF;
+            KerProduct.kerType = kerType;
+
+
+            last_i = KerProduct.getParamDMaxStepsCount();
+
+            for (i = 0; i < last_i; i++){
+                tempParamD = KerProduct.getParamDValue(i , last_i);
+                KerProduct.paramD = tempParamD;
+
+                for (tempParamI = KerProduct.getMinParamI(); tempParamI <= KerProduct.getMaxParamI(); tempParamI++)
+                {
+                    System.gc();
+                    KerProduct.paramI = tempParamI;
+
+                    performCrossFoldValidation(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
+
+                    if (tempAccuracy[0] > bestAcc)
+                    {
+                        bestAcc = tempAccuracy[0];
+                        bestKerType = kerType;
+                        bestParamD = tempParamD;
+                        bestParamI = tempParamI;
+                    }
+                }
+            }
+        }
+
+        KerProduct.kerType = bestKerType;
+        KerProduct.paramD = bestParamD;
+        KerProduct.paramI = bestParamI;
+    }
 
     public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException {
 
@@ -216,19 +274,25 @@ public class PvmSolver {
 
         PvmSolver solver = new PvmSolver();
 
-        /*KerProduct.kerType = KerProduct.KerType.KERRBF;
-        KerProduct.paramD = 1.0/32.0;
-        KerProduct.paramI = 0;
-          */
+        /*KerProduct.kerType = KerProduct.KerType.KERPOLY;
+        KerProduct.paramD = 0.001;//1.0/32.0;
+        KerProduct.paramI = 3;
+        */
+
         solver.core.ReadFile(args[0]);
         //solver.Train();
         //solver.TrainDistributed();
-        //solver.TrainSingleLP();
 
         double tempAccuracy[] = new double[1];
         double tempSensitivity[] = new double[1];
         double tempSpecificity[] = new double[1];
 
+          /*
+        solver.TrainSingleLP();
+        boolean labels[] = solver.classify(solver.core.entries);
+        solver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
+        */
+        solver.searchKernel(5);
         solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
     }
 }

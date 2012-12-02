@@ -53,7 +53,7 @@ public class PvmSystem {
 
         rngConstraints = new IloRange[baseCount * 2 + 2];
 
-        if (!CreateVariables(true))
+        if (!CreateVariables())
             return false;
 
         if (!AddSigmaRegularConstraints())
@@ -114,11 +114,11 @@ public class PvmSystem {
         return true;
     }
 
-    public boolean CreateVariables()
+    private boolean CreateVariables()
     {
-        return CreateVariables(true);
+        return CreateVariables(true, false, Double.MAX_VALUE);
     }
-    public boolean CreateVariables(boolean addHyperplaneOffsetVar){
+    private boolean CreateVariables(boolean addHyperplaneOffsetVar, boolean constrainedAlphas, double constrainedAlphasLimit){
         int i;
         if (addHyperplaneOffsetVar)
             vars = new IloNumVar[baseCount * 2 + 1];
@@ -127,8 +127,19 @@ public class PvmSystem {
 
         try
         {
-            for (i = 0; i < baseCount; i++)
-                vars[i] = cplex.numVar(-Double.MAX_VALUE, Double.MAX_VALUE, IloNumVarType.Float);
+            if (constrainedAlphas)
+            {
+                if (constrainedAlphasLimit < 0)
+                    constrainedAlphasLimit = -constrainedAlphasLimit;
+                for (i = 0; i < baseCount; i++)
+                    vars[i] = cplex.numVar(-constrainedAlphasLimit, constrainedAlphasLimit, IloNumVarType.Float);
+            }
+            else
+                for (i = 0; i < baseCount; i++)
+                    vars[i] = cplex.numVar(-Double.MAX_VALUE, Double.MAX_VALUE, IloNumVarType.Float);
+
+
+
 
             for (i = 0; i < baseCount; i++)
                 vars[i + baseCount] = cplex.numVar(0, Double.MAX_VALUE, IloNumVarType.Float);
@@ -146,7 +157,7 @@ public class PvmSystem {
 
     }
 
-    public boolean AddSigmaRegularConstraints(){
+    private boolean AddSigmaRegularConstraints(){
         int i, rngIdx = 0;
 
         for (i = 0; i < core.xPos.length; i++, rngIdx += 2)
@@ -161,7 +172,7 @@ public class PvmSystem {
 
     }
 
-    public boolean AddConstraintsForIdxPos(int idx, int rngIdx){
+    private boolean AddConstraintsForIdxPos(int idx, int rngIdx){
 
         int i;
         IloLinearNumExpr lin = null;
@@ -193,7 +204,7 @@ public class PvmSystem {
         return true;
     }
 
-    public boolean AddConstraintsForIdxNeg(int idx, int rngIdx){
+    private boolean AddConstraintsForIdxNeg(int idx, int rngIdx){
         int i;
         IloLinearNumExpr lin = null;
 
@@ -224,7 +235,7 @@ public class PvmSystem {
         return true;
     }
 
-    public boolean AddStrictlyPositiveAveragesConstraints(int rngIdx){
+    private boolean AddStrictlyPositiveAveragesConstraints(int rngIdx){
         int i;
         IloLinearNumExpr lin = null;
 
@@ -663,23 +674,49 @@ public class PvmSystem {
         obj = cplex.addMinimize(lin);
     }
 
+    private void setDenominatorEqualityConstraintInverse(int rngIdx, boolean setToZero) throws IloException{
+        int i;
+        double posTerm = core.xNeg.length - 1, negTerm = core.xPos.length - 1;
+        IloLinearNumExpr lin;
+
+        lin = cplex.linearNumExpr();
+
+        for (i = 0; i < core.xPos.length; i++)
+            lin.addTerm(posTerm, vars[core.xPos[i] + baseCount]);
+
+        for (i = 0; i < core.xNeg.length; i++)
+            lin.addTerm(negTerm, vars[core.xNeg[i] + baseCount]);
+
+        if (setToZero)
+            rngConstraints[rngIdx] = cplex.addEq(0, lin, "UnityEq");
+        else
+            rngConstraints[rngIdx] = cplex.addEq(posTerm * negTerm, lin, "UnityEq");
+    }
+
+    private void setSingleLPTypeObjectiveInverse() throws IloException{
+        int i;
+
+        IloLinearNumExpr lin;
+
+        lin = cplex.linearNumExpr();
+
+        for (i = 0; i < baseCount; i++)
+            lin.addTerm(core.kpos[i] - core.kneg[i], vars[i]);
+
+        obj = cplex.addMaximize(lin);
+    }
+
     public boolean buildSingleLPSystem(PvmDataCore pvms, boolean saveSys, boolean nameAllVars, boolean nameAllConstraints) throws IloException {
-        cplex = null;
-        try
-        {
-            cplex = new IloCplex();
-        }
-        catch (ilog.concert.IloException e)
-        {
-            return false;
-        }
+
+        cleanCplex();
+        addCplexSolver(false);
 
         core = pvms;
         baseCount = core.entries.size();
 
         rngConstraints = new IloRange[baseCount * 2 + 1];
 
-        if (!CreateVariables(false))
+        if (!CreateVariables(false, false, Double.MAX_VALUE))
             return false;
 
         if (!AddSigmaRegularConstraints())
@@ -687,6 +724,9 @@ public class PvmSystem {
 
         setDenominatorUnityEqualityConstraint(baseCount * 2);
         setSingleLPTypeObjective();
+
+        //setDenominatorEqualityConstraintInverse(baseCount * 2);
+        //setSingleLPTypeObjectiveInverse();
 
         if (nameAllVars)
             setVariableNames();
@@ -722,4 +762,113 @@ public class PvmSystem {
         return true;
     }
 
+    public boolean solveSingleLPSecondary(double [] resT) throws IloException {
+        int i, sigIdx;
+
+        if (!cplex.solve())
+            return false;
+
+        assert (resT.length > 0);
+
+        double [] x = cplex.getValues(vars);
+
+        for (i = 0; i < baseCount; i++)
+            core.alphas[i] = x[i];
+
+        for (i = 0; i < baseCount; i++)
+            core.sigmas[i] = 0;
+
+        core.recomputeHyperplaneBias(resT);
+
+        return true;
+
+    }
+
+    private void CreateSecondaryConstrainedVariables(double constrainedAlphasLimit) throws IloException {
+
+        int i;
+        vars = new IloNumVar[baseCount];
+
+        if (constrainedAlphasLimit < 0)
+            constrainedAlphasLimit = -constrainedAlphasLimit;
+        for (i = 0; i < baseCount; i++)
+            vars[i] = cplex.numVar(-constrainedAlphasLimit, constrainedAlphasLimit, IloNumVarType.Float);
+    }
+
+    private void AddSigmaVoidConstraints() throws IloException {
+        int i, rngIdx = 0;
+
+        for (i = 0; i < core.xPos.length; i++, rngIdx++)
+            AddSigmaVoidConstraintPos(core.xPos[i], rngIdx);
+
+
+        for (i = 0; i < core.xNeg.length; i++, rngIdx++)
+            AddSigmaVoidConstraintNeg(core.xNeg[i], rngIdx);
+    }
+
+    private void AddSigmaVoidConstraintPos(int idx, int rngIdx) throws IloException {
+        int i;
+        IloLinearNumExpr lin = null;
+
+        lin = cplex.linearNumExpr();
+
+        for (i = 0; i < baseCount; i++)
+            lin.addTerm(core.kpos[i] - core.gramMtx[idx][i], vars[i]);
+
+        rngConstraints[rngIdx] = cplex.addEq(lin, 0.0);
+    }
+
+    private void AddSigmaVoidConstraintNeg(int idx, int rngIdx) throws IloException {
+        int i;
+        IloLinearNumExpr lin = null;
+
+        lin = cplex.linearNumExpr();
+
+        for (i = 0; i < baseCount; i++)
+            lin.addTerm(core.kneg[i] - core.gramMtx[idx][i], vars[i]);
+
+        rngConstraints[rngIdx] = cplex.addEq(lin, 0.0);
+    }
+
+    public boolean buildSecondaryLpSystem (PvmDataCore pvms) throws IloException {
+
+        cleanCplex();
+        addCplexSolver(false);
+
+        core = pvms;
+        baseCount = core.entries.size();
+
+        rngConstraints = new IloRange[baseCount];
+
+        CreateSecondaryConstrainedVariables(1.0);
+        AddSigmaVoidConstraints();
+        setSingleLPTypeObjectiveInverse();
+
+        return true;
+    }
+
+    private void cleanCplex() throws IloException {
+        if (cplex != null)
+        {
+            cplex.clearModel();
+            cplex.endModel();
+            cplex.end();
+        }
+    }
+
+    @Override
+    protected void finalize() throws IloException {
+        cleanCplex();
+    }
+
+    private void addCplexSolver(boolean verbalize) throws IloException {
+        cplex = null;
+        cplex = new IloCplex();
+
+        if (!verbalize)
+            cplex.setOut(null);
+                                                       /*
+        cplex.setParam(IloCplex.IntParam.ParallelMode, 1);
+        cplex.setParam(IloCplex.IntParam.Threads, 1);*/
+    }
 }

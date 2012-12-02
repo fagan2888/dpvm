@@ -229,11 +229,15 @@ public class PvmDataCore {
         }
 
         if (sigmaPos < doubleEps && sigmaNeg < doubleEps)
-            return;
-
-        offsetB = - (sigmaPos * ksumNeg + sigmaNeg * ksumPos) / (sigmaPos + sigmaNeg);
-
-        resT[0] = sigmaPos / (ksumPos + offsetB);
+        {
+            offsetB = -(ksumPos + ksumNeg) / 2;
+            resT[0] = 0.0;
+        }
+        else
+        {
+            offsetB = - (sigmaPos * ksumNeg + sigmaNeg * ksumPos) / (sigmaPos + sigmaNeg);
+            resT[0] = sigmaPos / (ksumPos + offsetB);
+        }
     }
 
     private int [] getLabelCopiesPos(){
@@ -256,7 +260,7 @@ public class PvmDataCore {
     }
 
     public ArrayList<PvmDataCore> splitRandomIntoSlices(int sliceCount){
-        //todo : do sliceCount data fold
+
         int i;
         int cxPos[], cxNeg[];
         PvmDataCore cCore;
