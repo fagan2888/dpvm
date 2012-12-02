@@ -1,6 +1,5 @@
 package dsolve;
 
-import dsolve.lfs.LfsConstraint;
 import ilog.concert.*;
 import ilog.cplex.IloCplex;
 import org.apache.commons.lang3.Validate;

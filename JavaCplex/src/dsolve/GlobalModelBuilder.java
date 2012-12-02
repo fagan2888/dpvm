@@ -4,14 +4,14 @@ import dsolve.lfs.LfsConstraint;
 import dsolve.lfs.LfsReader;
 import ilog.concert.*;
 import ilog.cplex.IloCplex;
-import sun.org.mozilla.javascript.internal.ast.WhileLoop;
+import org.apache.log4j.Logger;
+import util.SolverLogger;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
-import java.util.logging.Logger;
 
 /**
  * Created with IntelliJ IDEA.
@@ -22,7 +22,7 @@ import java.util.logging.Logger;
 
 public class GlobalModelBuilder {
 
-    public static Logger logger = Logger.getLogger( GlobalModelBuilder.class.getName() );
+    public static Logger logger = SolverLogger.getLogger( GlobalModelBuilder.class.getName() );
 
     List<LfsConstraint> constraintsContainer = new ArrayList<LfsConstraint>();
     List<IloNumVar>  cplexNamedVariables = null;

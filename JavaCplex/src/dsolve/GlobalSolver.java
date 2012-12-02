@@ -21,7 +21,6 @@ public class GlobalSolver {
     private List<NamedCoordList> solutions = null;
     private List<LocalSolver> localSolvers = null;
     private NamedCoordList objective = null;
-    private double [] localSolutionWeights = null;
 
 
     public static Logger logger = Logger.getLogger( GlobalSolver.class.getName() );
@@ -34,64 +33,6 @@ public class GlobalSolver {
 	private NamedCoordList readCurrentObjective() throws IloException, IOException {
 		return LocalSolver.readObjectiveFromFile( objectiveFile );
 	}
-
-    private void computeLocalSolutionWeights(){
-        computeLocalSolutionWeights(1);
-    }
-
-    private void computeLocalSolutionWeights(double alphaPow){
-        int i;
-        double totalDist = 0.0, tempDist;
-
-        if (localSolutionWeights == null)
-            localSolutionWeights = new double[localSolvers.size()];
-
-        for (i = 0; i < localSolvers.size(); i++){
-            tempDist = euclidianDist( objective, solutions.get(i));
-            totalDist += localSolutionWeights[i] = Math.pow(tempDist, alphaPow);
-        }
-
-        if (totalDist < 1e-20)
-        {
-            for (i = 0; i < localSolutionWeights.length; i++)
-                localSolutionWeights[i] = 1.0 / (double)localSolutionWeights.length;
-
-            return;
-        }
-
-        for (i = 0; i < localSolutionWeights.length; i++)
-            localSolutionWeights[i] /= totalDist;
-    }
-
-    private NamedCoordList adjustCurrentObjectiveWeighted( NamedCoordList currentObj, List<NamedCoordList> solutions ) {
-        NamedCoordList newObj = new NamedCoordList( currentObj.size() );
-        int i, j;
-        double meanContrib;
-        NamedCoordList sol;
-
-        computeLocalSolutionWeights();
-
-        for (i = 0; i < currentObj.size(); i++ ) {
-            NamedCoord coord = new NamedCoord( currentObj.get(i).name, 0.0 );
-            meanContrib = 0;
-
-            for (j = 0; j < solutions.size(); j++){
-                sol = solutions.get(j);
-
-                if (sol.has(coord.name)){
-                    coord.val += sol.get(coord.name).val * localSolutionWeights[j];
-                    meanContrib += localSolutionWeights[j];
-                }
-            }
-
-            assert (meanContrib > 1e-20);
-            coord.val /= meanContrib;
-
-            newObj.add( coord );
-        }
-
-        return newObj.rebuild();
-    }
 
 	private NamedCoordList adjustCurrentObjective( NamedCoordList currentObj, List<NamedCoordList> solutions ) {
 
@@ -171,12 +112,8 @@ public class GlobalSolver {
                 solutions.add( solver.getSolution() );
             }
 
-            objective = adjustCurrentObjectiveWeighted(objective, solutions);
-            //objective = adjustCurrentObjective( objective, solutions );
+            objective = adjustCurrentObjective( objective, solutions );
             distance2Objective = computeDistance( objective, solutions );
-
-            if (iterCount % 10 == 0)
-                logger.info(String.format("Iter: %03d | Infeasibility Bound: %f", iterCount, distance2Objective));
 
             iterCount ++;
         }
