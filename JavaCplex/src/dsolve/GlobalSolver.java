@@ -34,7 +34,7 @@ public class GlobalSolver {
 		return LocalSolver.readObjectiveFromFile( objectiveFile );
 	}
 
-	private NamedCoordList adjustCurrentObjective( NamedCoordList currentObj, List<NamedCoordList> solutions ) {
+	public static NamedCoordList adjustCurrentObjective( NamedCoordList currentObj, List<NamedCoordList> solutions ) {
 
 		NamedCoordList newObj = new NamedCoordList( currentObj.size() );
 
@@ -148,7 +148,7 @@ public class GlobalSolver {
         return null;
     }
 
-	public double euclidianDist( NamedCoordList v1, NamedCoordList v2 ) {
+	public static double euclidianDist( NamedCoordList v1, NamedCoordList v2 ) {
 		double distance = 0;
 		v1.rebuild(); v2.rebuild();
 
@@ -165,7 +165,7 @@ public class GlobalSolver {
 		return distance;
 	}
 
-	private double computeDistance( NamedCoordList objective, List<NamedCoordList> solutions ) {
+	public static double computeDistance( NamedCoordList objective, List<NamedCoordList> solutions ) {
 		double distance = 0;
 		for ( NamedCoordList sol : solutions ) {
 			distance += euclidianDist( objective, sol );
