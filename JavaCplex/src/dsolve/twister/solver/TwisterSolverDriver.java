@@ -1,11 +1,12 @@
 package dsolve.twister.solver;
 
 import cgl.imr.base.TwisterException;
-import cgl.imr.base.TwisterMonitor;
 import cgl.imr.base.impl.JobConf;
 import cgl.imr.client.TwisterDriver;
 import dsolve.NamedCoordList;
+import dsolve.SolverHelper;
 import dsolve.twister.util.TwisterLogger;
+import ilog.concert.IloException;
 import org.apache.log4j.Logger;
 import org.safehaus.uuid.UUIDGenerator;
 
@@ -67,28 +68,45 @@ public class TwisterSolverDriver {
 
 		int maxIterCount = 1000;
 		int currentIter = 0;
+		double threashold = 10e-8;
 
-		List<NamedCoordList> solutions;
+		List<NamedCoordList> solutions = null;
+		NamedCoordList objective = null;
+		double distance2Objective = Double.MAX_VALUE;
+
+		try {
+			objective = SolverHelper.readObjectiveFromFile( SolverHelper.generateObjectivePoint( 10, null ) );
+		} catch ( IloException e ) {
+			e.printStackTrace();
+		}
 
 		while ( true ) {
 
-			if ( currentIter >= maxIterCount ) {
-				reportFailure();
+			// run the engine
+			driver.runMapReduceBCast( objective ).monitorTillCompletion();
+
+			// get the results
+			solutions = ( (TwisterSolverCombiner) driver.getCurrentCombiner() ).getSolutions();
+
+			objective = SolverHelper.adjustCurrentObjective( objective, solutions );
+			distance2Objective = SolverHelper.computeDistance( objective, solutions );
+
+			logger.info( String.format( "iter: %04d - dist: %10f", currentIter, distance2Objective ) );
+
+			if ( distance2Objective <= threashold ) {
+				logger.info( "we've reached a solution" );
+				logger.info( "solution: " + objective.toString() );
 				break;
 			}
 
-			TwisterMonitor monitor = driver.runMapReduce();
-			monitor.monitorTillCompletion();
-
-			solutions = ( (TwisterSolverCombiner) driver.getCurrentCombiner() ).getSolutions();
-
+			if ( currentIter >= maxIterCount ) {
+				logger.info( "we could not reach a valid solution" );
+				break;
+			}
+			currentIter++;
 		}
 
 		driver.close();
-	}
-
-	private void reportFailure() {
-		logger.info( "we could not reach a valid solution" );
 	}
 }
 

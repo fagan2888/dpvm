@@ -23,7 +23,7 @@ public class IterativeGlobalSolver {
 	private NamedCoordList objective = null;
 
 
-	public static Logger logger = SolverLogger.getLogger( GlobalSolver.class.getName() );
+	public static Logger logger = SolverLogger.getLogger( SolverHelper.class.getName() );
 
 	public IterativeGlobalSolver( List<String> modelFiles, String objectiveFile ) {
 		this.modelFileList = modelFiles;
@@ -31,7 +31,7 @@ public class IterativeGlobalSolver {
 	}
 
 	private NamedCoordList readCurrentObjective() throws IloException, IOException {
-		return LocalSolver.readObjectiveFromFile( objectiveFile );
+		return SolverHelper.readObjectiveFromFile( objectiveFile );
 	}
 
 	public NamedCoordList runSolver( int maxIterCount ) throws IloException, IOException {
@@ -55,10 +55,9 @@ public class IterativeGlobalSolver {
 	}
 
 	private void reInitCurrentSolvers() throws IloException {
-		int i;
-
-		for ( LocalSolver lSolver : localSolvers )
+		for ( LocalSolver lSolver : localSolvers ) {
 			lSolver.reInit();
+		}
 	}
 
 	private boolean iterateSolver( int maxIterCount, double feasibilityThreshold ) throws IloException {
@@ -88,8 +87,8 @@ public class IterativeGlobalSolver {
 				solutions.add( solver.getSolution() );
 			}
 
-			objective = GlobalSolver.adjustCurrentObjective( objective, solutions );
-			distance2Objective = GlobalSolver.computeDistance( objective, solutions );
+			objective = SolverHelper.adjustCurrentObjective( objective, solutions );
+			distance2Objective = SolverHelper.computeDistance( objective, solutions );
 
 			iterCount++;
 		}

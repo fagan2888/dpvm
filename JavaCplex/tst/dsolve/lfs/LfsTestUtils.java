@@ -1,12 +1,12 @@
 package dsolve.lfs;
 
-import dsolve.GlobalModelBuilder;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
+
+import static dsolve.SolverHelper.getRandomDouble;
 
 /**
  * Created with IntelliJ IDEA.
@@ -16,15 +16,6 @@ import java.util.*;
  */
 
 public class LfsTestUtils {
-	public static  double getRandomDouble( Random random, Boolean positive ) {
-		double val = random.nextInt()%100 + random.nextDouble();
-
-		if ( positive == null )     { return  val; }
-		if ( positive && val < 0 )  { return -val; }
-		if ( !positive && val > 0 ) { return -val; }
-
-		return val;
-	}
 
 	/**
 	 * Generates a random set of numbers in range [0, maxValue)
@@ -82,37 +73,6 @@ public class LfsTestUtils {
 			}
 
 			line = String.format( "%.5f|%.5f|%s", lowerBound, upperBound, line.substring( 0, line.length()-1 ) );
-			out.println( line );
-		}
-		out.close();
-		return temp.getAbsolutePath();
-	}
-
-	/**
-	 * @param dimCount
-	 * @param defaultValue if this is null, random will be used
-	 * @return the path to the file where the objective point was generated
-	 * @throws IOException
-	 */
-
-	public static String generateObjectivePoint( int dimCount, Double defaultValue ) throws IOException {
-
-		File temp = File.createTempFile( "temp-objective-point-", ".tmp" );
-		PrintWriter out = new PrintWriter( new FileWriter( temp.getAbsolutePath() ) );
-		Random random = new Random();
-
-		for ( int i=0; i<dimCount; i++ ) {
-			double val;
-			if ( defaultValue != null ) {
-				val = defaultValue;
-			} else {
-				val = getRandomDouble( random, null );
-			}
-
-			String line = String.format( "%s|%.5f",
-					GlobalModelBuilder.getVarNameByIndex( i ),
-					val
-			);
 			out.println( line );
 		}
 		out.close();

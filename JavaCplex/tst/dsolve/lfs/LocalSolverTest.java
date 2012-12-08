@@ -1,9 +1,6 @@
 package dsolve.lfs;
 
-import dsolve.GlobalModelBuilder;
-import dsolve.LocalSolver;
-import dsolve.NamedCoord;
-import dsolve.NamedCoordList;
+import dsolve.*;
 import ilog.concert.IloException;
 import junit.framework.Assert;
 import org.junit.Test;
@@ -46,7 +43,7 @@ public class LocalSolverTest {
 			LocalSolver localSolver = new LocalSolver();
 
 			localSolver.loadModelFromFile( modelFile );
-			localSolver.setObjectiveFromFile( LfsTestUtils.generateObjectivePoint( dimensions, 0.0 ) );
+			localSolver.setObjectiveFromFile( SolverHelper.generateObjectivePoint( dimensions, 0.0 ) );
             localSolver.exportModel( "local-model-exported.lp" );
 
 			Assert.assertTrue( "Localsolver didn't manage to solve the most simple system ever", localSolver.runSolver() );

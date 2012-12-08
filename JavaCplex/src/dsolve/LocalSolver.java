@@ -80,33 +80,8 @@ public class LocalSolver {
         setObjective( objExpr, true );
     }
 
-    public static NamedCoordList readObjectiveFromFile( String fileName ) throws IOException, IloException {
-
-        NamedCoordList objective = new NamedCoordList();
-
-        FileInputStream fstream;
-        DataInputStream in;
-        BufferedReader br;
-        String strLine;
-
-        fstream = new FileInputStream( fileName );
-        in = new DataInputStream( fstream );
-        br = new BufferedReader( new InputStreamReader( in ) );
-
-        while ( (strLine = br.readLine()) != null ) {
-
-            String[] pipeSplit = strLine.split( "\\|" );
-            Validate.isTrue( pipeSplit.length == 2, "Illegal format for line: " + strLine );
-
-            objective.add( new NamedCoord( pipeSplit[ 0 ], Double.parseDouble( pipeSplit[ 1 ] ) ) );
-        }
-        Validate.isTrue( objective.size() > 0, "The objective point needs to have at least one coordinate" );
-
-	    return objective.rebuild();
-    }
-
 	public void setObjectiveFromFile( String fileName ) throws IOException, IloException {
-		NamedCoordList objective = readObjectiveFromFile( fileName );
+		NamedCoordList objective = SolverHelper.readObjectiveFromFile( fileName );
 		setTargetObjectivePoint( objective );
 	}
 

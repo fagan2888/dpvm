@@ -13,7 +13,6 @@ import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.net.SocketException;
-import java.sql.Timestamp;
 import java.util.Date;
 
 /**
@@ -99,7 +98,9 @@ public class TwisterSolverMapTask implements MapTask {
 		// run local solver iteration
 		try {
 			cplexLocalSolver.setTargetObjectivePoint( objective );
+
 			systemSolved = cplexLocalSolver.runSolver();
+
 			solution = cplexLocalSolver.getSolution();
 
 			if ( systemSolved ) {
