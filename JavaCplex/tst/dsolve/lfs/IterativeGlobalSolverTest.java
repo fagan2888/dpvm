@@ -1,9 +1,8 @@
 package dsolve.lfs;
 
 import dsolve.GlobalModelBuilder;
-import dsolve.GlobalSolver;
+import dsolve.SolverHelper;
 import dsolve.IterativeGlobalSolver;
-import dsolve.LocalSolver;
 import ilog.concert.IloException;
 import junit.framework.Assert;
 import org.junit.Test;
@@ -24,7 +23,7 @@ public class IterativeGlobalSolverTest {
 	public void testGlobalSolverWithRandomFeasibleSystem () throws IOException, IloException {
 
 		int records = 1000;
-		int dimensions = 5;
+		int dimensions = 10;
 		int blocks = 2;
 
 		GlobalModelBuilder modelBuilder = new GlobalModelBuilder();
@@ -33,7 +32,7 @@ public class IterativeGlobalSolverTest {
 		modelBuilder.readModelFromFile( generatedFileName );
 		List<String> blockModelFiles = modelBuilder.splitIntoBlockFiles( records/blocks, true );
 
-		String objectiveFile = LfsTestUtils.generateObjectivePoint( dimensions, null );
+		String objectiveFile = SolverHelper.generateObjectivePoint( dimensions, null );
 
 		IterativeGlobalSolver globalSolver = new IterativeGlobalSolver( blockModelFiles, objectiveFile );
 
