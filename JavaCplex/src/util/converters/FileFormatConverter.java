@@ -1,5 +1,6 @@
-package util;
+package util.converters;
 
+import cgl.imr.types.DoubleVectorData;
 import dsolve.LocalSolver;
 import ilog.concert.IloException;
 import pvm.DatabaseLoader;
@@ -107,13 +108,65 @@ public class FileFormatConverter {
         out.close();
     }
 
+    public static void convertNumericalAndCategoricalToPvmFormat(String fileNameInput, String fileNameOutput) throws IOException {
+        convertNumericalAndCategoricalToPvmFormat(fileNameInput, fileNameOutput, ",", true);
+    }
+
+    public static ArrayList<String[]> splitFileToStrings(String fileNameInput, String separator) throws IOException {
+        FileInputStream fstream = new FileInputStream(fileNameInput);
+        DataInputStream in = new DataInputStream(fstream);
+        BufferedReader br = new BufferedReader(new InputStreamReader(in));
+        String strLine;
+
+        ArrayList<String[]> ret = new ArrayList<String[]>();
+
+
+        while ((strLine = br.readLine()) != null) {
+            ret.add(strLine.split(separator));
+        }
+
+        return ret;
+    }
+
+    public static void convertNumericalAndCategoricalToPvmFormat(String fileNameInput, String fileNameOutput, String separator, boolean firstValueIsClass) throws IOException {
+        //this will parse the txt and split each line by the separator
+        //missing values will be replaced by the average of that class
+        //categorical values will be replaced by conjunctions of booleans
+
+        int i;
+        ArrayList<String []> strings = splitFileToStrings(fileNameInput, separator);
+        FileStringDescription stringDescription = new FileStringDescription();
+        stringDescription.setArrayOfString(strings);
+        String pvmStrings[][] = stringDescription.getPvmDescription(firstValueIsClass);
+
+        File f = new File(fileNameOutput);
+
+        if (!f.exists())
+            f.createNewFile();
+
+        FileWriter foutstream = new FileWriter(f.getAbsoluteFile());
+        PrintWriter out = new PrintWriter(foutstream);
+
+        for (String [] cRecord : pvmStrings)
+        {
+            out.print(cRecord[0] + "|");
+
+            for (i = 1; i < cRecord.length; i++)
+                out.print(cRecord[i] + ",");
+
+            out.println();
+        }
+
+        out.close();
+    }
+
     public static void main(String[] args ) throws IOException {
 
         if (args.length < 1)
             return;
 
-        convertPvmFormatToLibSVM(args[0], args[1]);
+        //convertPvmFormatToLibSVM(args[0], args[1]);
         //convertLibSVMFormatToPvm(args[0], args[1]);
-
+        convertNumericalAndCategoricalToPvmFormat(args[0], args[1]);
     }
 }
