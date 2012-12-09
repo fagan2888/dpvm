@@ -6,6 +6,7 @@ import junit.framework.Assert;
 import org.junit.Test;
 
 import java.io.*;
+import java.net.URISyntaxException;
 import java.util.*;
 
 /**
@@ -26,11 +27,13 @@ public class LocalSolverTest {
 	}
 
 	@Test
-	public void testLocalSolverWithRandomFeasibleSystem () throws IOException, IloException {
+	public void testLocalSolverWithRandomFeasibleSystem () throws IOException, IloException, URISyntaxException {
 
         int records = 10;
         int dimensions = 5;
 		int blocks = 1;
+
+		SolverHelper.dropNativeCplex();
 
 		GlobalModelBuilder modelBuilder = new GlobalModelBuilder();
 		String generatedFileName = LfsTestUtils.generateRandomInput( records, dimensions, null );
@@ -49,5 +52,9 @@ public class LocalSolverTest {
 			Assert.assertTrue( "Localsolver didn't manage to solve the most simple system ever", localSolver.runSolver() );
 			printSolution( localSolver.getSolution() );
 		}
+	}
+
+	public static void main( String[] args ) throws IloException, IOException, URISyntaxException {
+		new LocalSolverTest().testLocalSolverWithRandomFeasibleSystem();
 	}
 }

@@ -2,8 +2,14 @@ package dsolve;
 
 import ilog.concert.IloException;
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
+import util.SolverLogger;
 
 import java.io.*;
+import java.lang.reflect.Field;
+import java.net.JarURLConnection;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
@@ -16,6 +22,8 @@ import java.util.Random;
  */
 
 public class SolverHelper {
+
+	public static Logger logger = SolverLogger.getLogger( SolverHelper.class.getName() );
 
 	public static NamedCoordList adjustCurrentObjective( NamedCoordList currentObj, List<NamedCoordList> solutions ) {
 		NamedCoordList newObj = new NamedCoordList( currentObj.size() );
@@ -155,24 +163,85 @@ public class SolverHelper {
 		}
 	}
 
-	public static void dropNativeCplex( String libName ) throws IOException {
-		// generate temporary directory as library path
-		String tempdir = System.getProperty( "java.io.tmpdir" ) + new Date().getTime();
-		String libraryInJar = "CPLEXLib" + File.separator + libName;
+	private static void addDir2JavaPath( String s ) throws IOException {
+		try {
+			Field field = ClassLoader.class.getDeclaredField( "usr_paths" );
+			field.setAccessible( true );
+			String[] paths = ( String[] ) field.get( null );
+			for ( String path : paths ) {
+				if ( s.equals( path ) ) {
+					return;
+				}
+			}
+			String[] tmp = new String[ paths.length + 1 ];
+			System.arraycopy( paths, 0, tmp, 0, paths.length );
+			tmp[ paths.length ] = s;
+			field.set( null, tmp );
+			System.setProperty( "java.library.path", System.getProperty( "java.library.path" ) + File.pathSeparator + s );
+		} catch ( IllegalAccessException e ) {
+			throw new IOException( "Failed to get permissions to set library path" );
+		} catch ( NoSuchFieldException e ) {
+			throw new IOException( "Failed to get field handle to set library path" );
+		}
+	}
 
-		InputStream inputStream = ClassLoader.getSystemResourceAsStream( libraryInJar );
-		if ( inputStream == null ) {
-			System.out.println( "cplex native library not in this jar; trying to load from disk" );
-			inputStream = new FileInputStream( libraryInJar );
-			return;
+	private static boolean isWindows() {
+		String osName = System.getProperty("os.name").toLowerCase();
+		return osName.contains( "win" );
+	}
+
+	private static boolean isUnix() {
+		String osName = System.getProperty("os.name").toLowerCase();
+		return osName.contains( "nix" ) || osName.contains( "nux" ) || osName.contains("aix");
+	}
+
+	public static void listJarFiles( String dirPath ) throws URISyntaxException, IOException {
+		System.out.println( "Listing resources like: " + dirPath );
+		URL url = ClassLoader.getSystemResource( dirPath );
+		if ( url != null ) {
+			System.out.println( "file: "+ url.toURI() );
+		}
+	}
+
+	public static void dropNativeCplex() throws IOException, URISyntaxException {
+
+		// generate temporary directory as library path
+		String tempdir = System.getProperty( "java.io.tmpdir" ) + File.separator + new Date().getTime();
+
+		String libName = "libcplex124.so";
+		if ( isWindows() ) {
+			libName = "cplex124.dll";
+		}
+
+		URL url = ClassLoader.getSystemResource( libName );
+		InputStream inputStream = null;
+		if ( url != null ) {
+			logger.info( "found in jar as: " + url.toURI() );
+			JarURLConnection conn = (JarURLConnection )url.openConnection();
+			inputStream = conn.getInputStream();
+			if ( inputStream == null ) {
+				logger.info( "cplex native library not in this jar; trying to load from disk" );
+				inputStream = new FileInputStream( new File( libName ) );
+				if ( inputStream == null ) {
+					logger.error( "could not load lib: " + libName );
+					return;
+				}
+			}
 		}
 
 		File libraryPath = new File( tempdir );
 		libraryPath.mkdirs();
 
-		OutputStream outputStream =  new FileOutputStream( libraryPath + File.separator + libName );
+		String finalLibPath = libraryPath + File.separator + libName;
+		OutputStream outputStream = new FileOutputStream( finalLibPath );
 		copyStream( inputStream, outputStream );
+		logger.info( "library: " + finalLibPath + " dropped to disk" );
 
-		System.setProperty( "java.library.path", libraryPath.getAbsolutePath() );
+		// close file streams
+		inputStream.close();
+		outputStream.close();
+
+		addDir2JavaPath( libraryPath.getAbsolutePath() );
+		logger.info( String.format( "library: %s added to java library path env", libraryPath ) );
 	}
 }
