@@ -18,7 +18,7 @@ import java.net.URISyntaxException;
 public class SolverHelperTest {
 	@Test
 	public void testDroppingNativeLibrary() throws IOException, URISyntaxException {
-		SolverHelper.dropNativeCplex();
+		SolverHelper.dropNativeCplex( "." );
 		String []path = System.getProperty( "java.library.path" ).split( ";" );
 		String dropPath = path[path.length-1];
 		System.out.println( "droppath : " + dropPath );

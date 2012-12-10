@@ -7,6 +7,7 @@ import cgl.imr.data.file.FileData;
 import cgl.imr.types.StringKey;
 import dsolve.LocalSolver;
 import dsolve.NamedCoordList;
+import dsolve.SolverHelper;
 import dsolve.twister.util.TwisterLogger;
 import ilog.concert.IloException;
 import org.apache.log4j.Logger;
@@ -29,6 +30,7 @@ public class TwisterSolverMapTask implements MapTask {
 
 	private LocalSolver cplexLocalSolver = null;
 	private StringKey outKey = null;
+	private NamedCoordList emptySolution = new NamedCoordList();
 
 	@Override
 	public void close() throws TwisterException {
@@ -43,14 +45,25 @@ public class TwisterSolverMapTask implements MapTask {
 			e.printStackTrace();
 		}
 
+		try {
+			String appsDir = jobConf.getProperty( TwisterSolverDriver.TWSITER_APPS_DIR_CONFIG );
+			SolverHelper.setLogger( logger );
+			SolverHelper.dropNativeCplex( appsDir );
+		} catch ( Throwable e ) {
+			logger.error( "could not load native cplex", e );
+			cplexLocalSolver = null;
+			return;
+		}
+
 		// set the key used by this mapper to send back it's solutions
 		outKey = new StringKey( getMapperIdentity() );
-		logger.info( "configure() from mapper taskid: " + outKey );
+		logger.info( "configure() from mapper taskid: " + outKey.getString() );
 
 		// load equations block into local solver
 		modelFileName = ( (FileData) mapperConf.getDataPartition() ).getFileName();
 		try {
 			logger.info( "starting to load equations block from file: " + modelFileName );
+			cplexLocalSolver = new LocalSolver();
 			cplexLocalSolver.loadModelFromFile( modelFileName );
 		} catch ( IloException e ) {
 			e.printStackTrace();
@@ -61,7 +74,7 @@ public class TwisterSolverMapTask implements MapTask {
 
 	private String getMapperIdentity() {
 		try {
-			return  TwisterLogger.getHostIp() + (new Date().getTime()/1000);
+			return  TwisterLogger.getHostIp() + "--" + (new Date().getTime()/1000);
 		} catch ( SocketException e ) {
 			e.printStackTrace();
 		}
@@ -79,19 +92,25 @@ public class TwisterSolverMapTask implements MapTask {
 
 		logger.info( "key: " + ( ( StringKey ) key ).getString() + " val: " + value.toString() );
 
+		if ( cplexLocalSolver == null ) {
+			logger.error( "we don't have a local solver loaded; returning null solution" );
+			mapOutputCollector.collect( outKey, emptySolution );
+			return;
+		}
+
 		// get current objective to optimize
 		objective = new NamedCoordList();
 		try {
 			objective.fromBytes( value.getBytes() );
 		} catch ( SerializationException e ) {
 			logger.error( "could not transform objective from received bytes", e );
-			mapOutputCollector.collect( outKey, null );
+			mapOutputCollector.collect( outKey, emptySolution );
 			return;
 		}
 
 		if ( objective.size() <= 0 ) {
 			logger.error( "the objective size <= 0: " + objective.size(), new IllegalArgumentException() );
-			mapOutputCollector.collect( outKey, null );
+			mapOutputCollector.collect( outKey, emptySolution );
 			return;
 		}
 
@@ -104,15 +123,15 @@ public class TwisterSolverMapTask implements MapTask {
 			solution = cplexLocalSolver.getSolution();
 
 			if ( systemSolved ) {
+				logger.info( "blocked solved with sol: " + solution );
 				mapOutputCollector.collect( outKey, solution );
 			} else {
 				logger.error( "local solver could not solve block" );
-				mapOutputCollector.collect( outKey, null );
+				mapOutputCollector.collect( outKey, emptySolution );
 			}
 		} catch ( IloException e ) {
 			logger.error( "local solver was unable to solve model", e );
-			mapOutputCollector.collect( outKey, null );
-			return;
+			mapOutputCollector.collect( outKey, emptySolution );
 		}
 	}
 }

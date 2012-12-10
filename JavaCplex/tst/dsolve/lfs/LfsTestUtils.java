@@ -1,5 +1,8 @@
 package dsolve.lfs;
 
+import dsolve.GlobalModelBuilder;
+import ilog.concert.IloException;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -77,5 +80,13 @@ public class LfsTestUtils {
 		}
 		out.close();
 		return temp.getAbsolutePath();
+	}
+
+	public static List<String> generateRandomGlobalSystem( int records, int dimensions, int blocks ) throws IOException, IloException {
+		GlobalModelBuilder modelBuilder = new GlobalModelBuilder();
+		String generatedFileName = LfsTestUtils.generateRandomInput( records, dimensions, null );
+
+		modelBuilder.readModelFromFile( generatedFileName );
+		return modelBuilder.splitIntoBlockFiles( records/blocks, true );
 	}
 }
