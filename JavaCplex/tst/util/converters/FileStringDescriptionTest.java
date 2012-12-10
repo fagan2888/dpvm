@@ -20,7 +20,7 @@ public class FileStringDescriptionTest {
     private class FileStringDescriptionForTest extends FileStringDescription{
         public int computeFeaturesCountForTest(ArrayList<String[]> strings){return computeFeaturesCount(strings);}
         public void computeAveragesForTest(){computeAverages();}
-        public void getStringCategoricalAndAveragesForTest(){getStringCategoricalAndAverages();}
+        public void getStringCategoricalAndAveragesForTest(boolean labelFirst) throws IOException {getStringCategoricalAndAverages(labelFirst);}
 
 
         public int getFeaturesCount(){return featuresCount;}
@@ -71,7 +71,65 @@ public class FileStringDescriptionTest {
     }
 
     @Test
-    public void test_GetStringCategoricalAndAverages_GetsCorrectCategoricals(){
+    public void test_addCategoricalRecordFeature_DoesNotAddCategoricalOnEmptyString(){
+        ArrayList<String[]> strings = new ArrayList<String[]>(3);
+        FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
+
+        strings.add(new String [] {"0", "a"});
+        strings.add(new String[] {"1", "b"});
+        strings.add(new String[] {"2", ""});
+
+        tested.setArrayOfString(strings);
+        tested.computeFeaturesCount(strings);
+        tested.initVectors();
+
+        Assert.assertEquals(tested.addCategoricalRecordFeature(1, ""), null);
+    }
+
+    @Test
+    public void test_addCategoricalRecordFeature_CreatesNewCategoricalForNonEmptyString(){
+        ArrayList<String[]> strings = new ArrayList<String[]>(3);
+        FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
+
+        strings.add(new String [] {"0", "a"});
+        strings.add(new String[] {"1", "b"});
+        strings.add(new String[] {"2", ""});
+
+        tested.setArrayOfString(strings);
+        tested.computeFeaturesCount(strings);
+        tested.initVectors();
+
+        ArrayList<String> categorical = tested.addCategoricalRecordFeature(1, "a");
+
+        Assert.assertNotNull(categorical);
+        Assert.assertTrue(categorical.get(0).contentEquals("a"));
+    }
+
+    @Test
+    public void test_addCategoricalRecordFeature_DoesNotAddAStringTwice(){
+        ArrayList<String[]> strings = new ArrayList<String[]>(3);
+        FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
+
+        strings.add(new String [] {"0", "a"});
+        strings.add(new String[] {"1", "b"});
+        strings.add(new String[] {"2", ""});
+
+        tested.setArrayOfString(strings);
+        tested.computeFeaturesCount(strings);
+        tested.initVectors();
+
+        tested.addCategoricalRecordFeature(0, "0");
+        tested.addCategoricalRecordFeature(0, "1");
+        tested.addCategoricalRecordFeature(0, "2");
+        ArrayList<String> categorical = tested.addCategoricalRecordFeature(0, "1");
+
+        for (int i = 0; i < categorical.size(); i++)
+            for (int j = i + 1; j < categorical.size(); j++)
+                Assert.assertTrue(!categorical.get(i).contentEquals(categorical.get(j)));
+    }
+
+    @Test
+    public void test_GetStringCategoricalAndAverages_GetsCorrectCategoricals() throws IOException {
 
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
@@ -85,7 +143,7 @@ public class FileStringDescriptionTest {
 
         tested.setArrayOfString(strings);
         tested.computeFeaturesCount(strings);
-        tested.getStringCategoricalAndAveragesForTest();
+        tested.getStringCategoricalAndAveragesForTest(false);
 
         ArrayList<ArrayList<String>> categoricals = tested.getCategoricals();
 
@@ -98,20 +156,20 @@ public class FileStringDescriptionTest {
     }
 
     @Test
-    public void test_GetStringCategoricalAndAverages_GetCorrectDoubleSums(){
+    public void test_GetStringCategoricalAndAverages_GetCorrectDoubleSums() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
-        String s0[] = {"0", "1"};
+        String s0[] = {"0", "1", "a"};
         strings.add(s0);
-        String s1[] = {"1", ""};
+        String s1[] = {"1", "", "b"};
         strings.add(s1);
-        String s2[] = {"2", "4"};
+        String s2[] = {"2", "4", "a"};
         strings.add(s2);
 
         tested.setArrayOfString(strings);
         tested.computeFeaturesCount(strings);
-        tested.getStringCategoricalAndAveragesForTest();
+        tested.getStringCategoricalAndAveragesForTest(false);
 
         double sums[] = tested.getAverages();
 
@@ -120,7 +178,7 @@ public class FileStringDescriptionTest {
     }
 
     @Test
-    public void test_GetStringCategoricalAndAverages_GetCorrectDoubleCount(){
+    public void test_GetStringCategoricalAndAverages_GetCorrectDoubleCount() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
@@ -133,7 +191,7 @@ public class FileStringDescriptionTest {
 
         tested.setArrayOfString(strings);
         tested.computeFeaturesCount(strings);
-        tested.getStringCategoricalAndAveragesForTest();
+        tested.getStringCategoricalAndAveragesForTest(false);
 
         int counts[] = tested.getCounts();
 
@@ -142,7 +200,7 @@ public class FileStringDescriptionTest {
     }
 
     @Test
-    public void test_computeFinalFeatureCount_CorrectFeatureLabelFirstAndBinaryCategoricals(){
+    public void test_computeFinalFeatureCount_CorrectFeatureLabelFirstAndBinaryCategoricals() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
@@ -154,7 +212,7 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(true);
 
         int totalFeatureCount = tested.computeFinalFeatureCount(true);
 
@@ -162,7 +220,7 @@ public class FileStringDescriptionTest {
     }
 
     @Test
-    public void test_computeFinalFeatureCount_CorrectFeatureLabelFirstAndMultinomialCategoricals(){
+    public void test_computeFinalFeatureCount_CorrectFeatureLabelFirstAndMultinomialCategoricals() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
@@ -174,7 +232,7 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(true);
 
         int totalFeatureCount = tested.computeFinalFeatureCount(true);
 
@@ -182,7 +240,7 @@ public class FileStringDescriptionTest {
     }
 
     @Test
-    public void test_computeFinalFeatureCount_CorrectFeatureLabelLast(){
+    public void test_computeFinalFeatureCount_CorrectFeatureLabelLast() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
@@ -194,7 +252,7 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         int totalFeatureCount = tested.computeFinalFeatureCount(false);
 
@@ -202,7 +260,7 @@ public class FileStringDescriptionTest {
     }
 
     @Test
-    public void test_featureIsEmpty_EliminatesSingletons(){
+    public void test_featureIsEmpty_EliminatesSingletons() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
@@ -214,14 +272,14 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         Assert.assertTrue(tested.featureIsEmpty(1));
         Assert.assertTrue(tested.featureIsEmpty(2));
     }
 
     @Test
-    public void test_featureIsEmpty_EliminatesEmpty(){
+    public void test_featureIsEmpty_EliminatesEmpty() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
@@ -233,14 +291,14 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         Assert.assertTrue(tested.featureIsEmpty(1));
         Assert.assertTrue(tested.featureIsEmpty(2));
     }
 
     @Test
-    public void test_featureIsEmpty_DoesNotEliminateNonEmpty(){
+    public void test_featureIsEmpty_DoesNotEliminateNonEmpty() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
 
@@ -252,14 +310,14 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         Assert.assertTrue(!tested.featureIsEmpty(0));
         Assert.assertTrue(!tested.featureIsEmpty(3));
     }
 
     @Test
-    public void test_fillMissingFeature_FillsDoubleVals(){
+    public void test_fillMissingFeature_FillsDoubleVals() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
         String destStrings[] = new String[2];
@@ -272,7 +330,7 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         int cidx = 0;
 
@@ -286,7 +344,7 @@ public class FileStringDescriptionTest {
 
 
     @Test
-    public void test_fillMissingFeature_FillsCategorical(){
+    public void test_fillMissingFeature_FillsCategorical() throws IOException {
         ArrayList<String[]> strings = new ArrayList<String[]>(3);
         FileStringDescriptionForTest tested = new FileStringDescriptionForTest();
         String destStrings[] = new String[4];
@@ -299,7 +357,7 @@ public class FileStringDescriptionTest {
         strings.add(s2);
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         int cidx = 0;
 
@@ -324,7 +382,7 @@ public class FileStringDescriptionTest {
         strings.add(new String[]{"2", "", "c", "cu"});
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         int cidx = 0;
 
@@ -343,7 +401,7 @@ public class FileStringDescriptionTest {
         strings.add(new String[]{"2", "", "c", "cu"});
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         int cidx = 0;
 
@@ -366,7 +424,7 @@ public class FileStringDescriptionTest {
         strings.add(new String[]{"2", "", "c", "cu"});
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         int cidx = 0;
 
@@ -399,7 +457,7 @@ public class FileStringDescriptionTest {
         strings.add(new String[]{"2", "", "c", "cu"});
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(false);
 
         int cidx = 0;
 
@@ -417,14 +475,14 @@ public class FileStringDescriptionTest {
         strings.add(new String[]{"1", "2", "", "c", "cu", ""});
 
         tested.setArrayOfString(strings);
-        tested.getStringCategoricalAndAverages();
+        tested.getStringCategoricalAndAverages(true);
 
         int totalFeaturesCount = tested.computeFinalFeatureCount(true);
 
         String retStrings[] = tested.getPvmDescriptionSingleRecord(srcStrings, true, totalFeaturesCount);
 
         Assert.assertTrue(retStrings.length == totalFeaturesCount + 1);
-        Assert.assertTrue(retStrings[0].contentEquals("1"));
+        Assert.assertTrue(retStrings[0].contentEquals("0"));
         Assert.assertTrue(retStrings[1].contentEquals("5"));
         Assert.assertTrue(retStrings[2].contentEquals("1"));
         Assert.assertTrue(retStrings[3].contentEquals("0"));
@@ -448,16 +506,14 @@ public class FileStringDescriptionTest {
         String cStrings[], destString[];
 
         cStrings = resStrings[0];
-        destString = new String[] {"1", "0", "0", "1", "0", "0", "0"};
+        destString = new String[] {"0", "0", "0", "1", "0", "0", "0"};
 
         Assert.assertTrue(cStrings.length == destString.length);
         for (int i = 0; i < cStrings.length; i++)
             Assert.assertTrue(cStrings[i].contentEquals(destString[i]));
 
-
-
         cStrings = resStrings[1];
-        destString = new String[] {"0", String.valueOf(1.0), String.valueOf(0.5), "0", "1", "0", "1"};
+        destString = new String[] {"1", String.valueOf(1.0), String.valueOf(0.5), "0", "1", "0", "1"};
 
         Assert.assertTrue(cStrings.length == destString.length);
         for (int i = 0; i < cStrings.length; i++)
@@ -465,7 +521,7 @@ public class FileStringDescriptionTest {
 
 
         cStrings = resStrings[2];
-        destString = new String[] {"1", "2", "1", "0", "0", "1", String.valueOf(0.5)};
+        destString = new String[] {"0", "2", "1", "0", "0", "1", String.valueOf(0.5)};
 
         Assert.assertTrue(cStrings.length == destString.length);
         for (int i = 0; i < cStrings.length; i++)

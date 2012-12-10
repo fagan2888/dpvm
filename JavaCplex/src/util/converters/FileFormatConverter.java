@@ -160,13 +160,47 @@ public class FileFormatConverter {
         out.close();
     }
 
+    public static void callConversion(String[] args) throws IOException {
+        int i;
+
+        assert (args.length > 2);
+
+        for (i = 2; i < args.length; i++)
+            args[i] = args[i].toLowerCase();
+
+        if (args[2].contentEquals("ptol")){
+            convertPvmFormatToLibSVM(args[0], args[1]);
+            return;
+        }
+
+        if (args[2].contentEquals("ltop")){
+            convertLibSVMFormatToPvm(args[0], args[1]);
+            return;
+        }
+
+        if (args[2].contentEquals("gtop")){
+            if (args.length == 3){
+                convertNumericalAndCategoricalToPvmFormat(args[0], args[1]);
+                return;
+            }
+            else if (args.length == 5){
+                convertNumericalAndCategoricalToPvmFormat(args[0], args[1], args[3], args[4].contentEquals("0"));
+                return;
+            }
+        }
+
+        printUsage();
+    }
+
+    public static void printUsage(){
+
+    }
+
     public static void main(String[] args ) throws IOException {
 
-        if (args.length < 1)
+        if (args.length < 3)
             return;
 
-        //convertPvmFormatToLibSVM(args[0], args[1]);
-        //convertLibSVMFormatToPvm(args[0], args[1]);
         convertNumericalAndCategoricalToPvmFormat(args[0], args[1]);
     }
 }

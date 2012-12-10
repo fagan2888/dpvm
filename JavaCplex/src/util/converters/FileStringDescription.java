@@ -45,8 +45,29 @@ public class FileStringDescription {
         return featuresCount;
     }
 
-    protected void getStringCategoricalAndAverages(){
-        int i, j;
+    protected ArrayList<String> addCategoricalRecordFeature(int featIdx, String recFeat){
+        ArrayList<String> cCateg = categoricals.get(featIdx);
+
+        if (recFeat.length() < 1)
+            return null;
+
+        if (categoricals.get(featIdx) == null){
+            cCateg = new ArrayList<String>(1);
+            categoricals.remove(featIdx);
+            categoricals.add(featIdx, cCateg);
+        }
+
+        for (String featStr : cCateg){
+            if (featStr.contentEquals(recFeat))
+                return cCateg;
+        }
+
+        cCateg.add(recFeat);
+        return cCateg;
+    }
+
+    protected void getStringCategoricalAndAverages(boolean labelFirst) throws IOException {
+        int i, j, first_i = 0, last_i, labelIdx;
         double temp;
 
         if (featuresCount == 0)
@@ -54,8 +75,23 @@ public class FileStringDescription {
 
         initVectors();
 
+        if (featuresCount < 1)
+            throw new IOException("Source strings contain too few features");
+
+        last_i = featuresCount;
+        if (labelFirst){
+            labelIdx = 0;
+            first_i++;
+        }
+        else{
+            last_i--;
+            labelIdx = last_i;
+        }
+
         for (String [] rec : srcStrings){
-            for (i = 0; i < rec.length; i++){
+            addCategoricalRecordFeature(labelIdx, rec[labelIdx]);
+
+            for (i = first_i; i < last_i; i++){
 
                 if (rec[i].length() < 1)
                     continue;
@@ -66,17 +102,7 @@ public class FileStringDescription {
                     numericalAverages[i] += temp;
                     numericalCounts[i]++;
                 } catch (NumberFormatException e) {
-                    if (categoricals.get(i) == null){
-                        categoricals.remove(i);
-                        categoricals.add(i, new ArrayList<String>());
-                    }
-
-                    for (j = 0; j < categoricals.get(i).size(); j++)
-                        if (categoricals.get(i).get(j).matches(rec[i]))
-                            break;
-
-                    if (j >= categoricals.get(i).size())
-                        categoricals.get(i).add(rec[i]);
+                    addCategoricalRecordFeature(i, rec[i]);
                 }
             }
 
@@ -199,12 +225,12 @@ public class FileStringDescription {
 
         if (labelFirst){
             i = 1;
-            retStrings[0] = srcStr[0];
+            retStrings[0] = String.valueOf(getCategoricalIndex(srcStr[0], 0));
         }
         else{
             i = 0;
             last_i--;
-            retStrings[0] = srcStr[last_i];
+            retStrings[0] = String.valueOf(getCategoricalIndex(srcStr[last_i], 0));
         }
 
         cidx = 1;
@@ -232,7 +258,7 @@ public class FileStringDescription {
     public String[][] getPvmDescription(boolean labelFirst) throws IOException {
         int i;
 
-        getStringCategoricalAndAverages();
+        getStringCategoricalAndAverages(labelFirst);
 
         int totalFeatureCount = computeFinalFeatureCount(labelFirst);
         String retStrings[][] = new String[srcStrings.size()][];
