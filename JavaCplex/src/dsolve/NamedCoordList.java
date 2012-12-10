@@ -81,6 +81,9 @@ public class NamedCoordList implements Cloneable, Value {
 
 	private String convertToString() {
 		String stringList = "";
+
+		if ( list.size() == 0 ) { return stringList; }
+
 		for ( NamedCoord namedCoord : list ) {
 			stringList += String.format( "%s:%f,", namedCoord.name, namedCoord.val );
 		}
@@ -110,5 +113,9 @@ public class NamedCoordList implements Cloneable, Value {
 	@Override
 	public byte[] getBytes() throws SerializationException {
 		return convertToString().getBytes();
+	}
+
+	public boolean isEmpty() {
+		return list.size() == 0;
 	}
 }

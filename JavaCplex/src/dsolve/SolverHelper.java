@@ -23,7 +23,11 @@ import java.util.Random;
 
 public class SolverHelper {
 
-	public static Logger logger = SolverLogger.getLogger( SolverHelper.class.getName() );
+	private static Logger logger = SolverLogger.getLogger( SolverHelper.class.getName() );
+
+	public static void setLogger( Logger logger ) {
+		SolverHelper.logger = logger;
+	}
 
 	public static NamedCoordList adjustCurrentObjective( NamedCoordList currentObj, List<NamedCoordList> solutions ) {
 		NamedCoordList newObj = new NamedCoordList( currentObj.size() );
@@ -186,24 +190,32 @@ public class SolverHelper {
 	}
 
 	private static boolean isWindows() {
-		String osName = System.getProperty("os.name").toLowerCase();
+		String osName = System.getProperty( "os.name" ).toLowerCase();
 		return osName.contains( "win" );
 	}
 
 	private static boolean isUnix() {
-		String osName = System.getProperty("os.name").toLowerCase();
-		return osName.contains( "nix" ) || osName.contains( "nux" ) || osName.contains("aix");
+		String osName = System.getProperty( "os.name" ).toLowerCase();
+		return osName.contains( "nix" ) || osName.contains( "nux" ) || osName.contains( "aix" );
 	}
 
 	public static void listJarFiles( String dirPath ) throws URISyntaxException, IOException {
-		System.out.println( "Listing resources like: " + dirPath );
+		logger.info( "Listing resources like: " + dirPath );
 		URL url = ClassLoader.getSystemResource( dirPath );
 		if ( url != null ) {
-			System.out.println( "file: "+ url.toURI() );
+			logger.info( "file: " + url.toURI() );
+		}
+
+		String classPath = System.getProperty( "java.library.path" );
+		for ( String pathDir : classPath.split( ":" ) ) {
+			logger.info( "pathDir: " + pathDir );
 		}
 	}
 
-	public static void dropNativeCplex() throws IOException, URISyntaxException {
+	public static void dropNativeCplex( String pathFolder ) throws IOException, URISyntaxException {
+
+		logger.info( "adding dir to java path: " + pathFolder );
+		addDir2JavaPath( pathFolder );
 
 		// generate temporary directory as library path
 		String tempdir = System.getProperty( "java.io.tmpdir" ) + File.separator + new Date().getTime();
@@ -213,19 +225,30 @@ public class SolverHelper {
 			libName = "cplex124.dll";
 		}
 
+		listJarFiles( libName );
+
 		URL url = ClassLoader.getSystemResource( libName );
 		InputStream inputStream = null;
 		if ( url != null ) {
 			logger.info( "found in jar as: " + url.toURI() );
-			JarURLConnection conn = (JarURLConnection )url.openConnection();
+			JarURLConnection conn = ( JarURLConnection ) url.openConnection();
 			inputStream = conn.getInputStream();
+		}
+
+		if ( inputStream == null ) {
+			logger.info( "cplex native library not in this jar; trying to load from disk" );
+			File libFile = new File( pathFolder+ File.separator + libName );
+			if ( !libFile.exists() ) {
+				logger.error(
+						"cplex native library does not exists at location: " + libFile.getAbsolutePath(),
+						new FileNotFoundException( libFile.getAbsolutePath() )
+				);
+				return;
+			}
+			inputStream = new FileInputStream( libFile );
 			if ( inputStream == null ) {
-				logger.info( "cplex native library not in this jar; trying to load from disk" );
-				inputStream = new FileInputStream( new File( libName ) );
-				if ( inputStream == null ) {
-					logger.error( "could not load lib: " + libName );
-					return;
-				}
+				logger.error( "could not read from libfile: " + libFile.getAbsolutePath() );
+				return;
 			}
 		}
 
@@ -238,7 +261,6 @@ public class SolverHelper {
 		logger.info( "library: " + finalLibPath + " dropped to disk" );
 
 		// close file streams
-		inputStream.close();
 		outputStream.close();
 
 		addDir2JavaPath( libraryPath.getAbsolutePath() );
