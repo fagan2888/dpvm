@@ -847,6 +847,17 @@ public class PvmSystem {
         return true;
     }
 
+    protected void addUnitSphereConstraint() throws IloException {
+        //todo
+
+        IloLQNumExpr sphereConstraint = cplex.lqNumExpr();
+
+        for (int i = 0; i < baseCount; i++)
+            sphereConstraint.addTerm(1.0, vars[i], vars[i]);
+
+        cplex.addLe(sphereConstraint, 1.0);
+    }
+
     private void cleanCplex() throws IloException {
         if (cplex != null)
         {

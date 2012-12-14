@@ -2,6 +2,7 @@ package pvm;
 
 import dsolve.LocalSolver;
 import ilog.concert.IloException;
+import sun.awt.geom.Crossings;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -232,9 +233,9 @@ public class PvmSolver {
         double tempSpecificity[] = new double[1];
 
 
-        //for (KerProduct.KerType kerType : KerProduct.KerType.values())
+        for (KerProduct.KerType kerType : KerProduct.KerType.values())
         {
-            KerProduct.KerType kerType = KerProduct.KerType.KERRBF;
+        //    KerProduct.KerType kerType = KerProduct.KerType.KERRBF;
             KerProduct.kerType = kerType;
 
 
@@ -242,6 +243,7 @@ public class PvmSolver {
 
             for (i = 0; i < last_i; i++){
                 tempParamD = KerProduct.getParamDValue(i , last_i);
+                //tempParamD = Math.pow(2, -17);
                 KerProduct.paramD = tempParamD;
 
                 for (tempParamI = KerProduct.getMinParamI(); tempParamI <= KerProduct.getMaxParamI(); tempParamI++)
@@ -274,10 +276,10 @@ public class PvmSolver {
 
         PvmSolver solver = new PvmSolver();
 
-        /*KerProduct.kerType = KerProduct.KerType.KERPOLY;
-        KerProduct.paramD = 0.001;//1.0/32.0;
-        KerProduct.paramI = 3;
-        */
+        KerProduct.kerType = KerProduct.KerType.KERSCALAR;
+        KerProduct.paramD = 1.0/32.0;
+        KerProduct.paramI = 1;
+
 
         solver.core.ReadFile(args[0]);
         //solver.Train();
@@ -292,7 +294,15 @@ public class PvmSolver {
         boolean labels[] = solver.classify(solver.core.entries);
         solver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
         */
-        solver.searchKernel(5);
+
+        solver.TrainSingleLP();
+        boolean retLabels[] = solver.classify(solver.core.entries);
+        PvmSolver.computeAccuracy(retLabels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
+
+
+        solver.searchKernel(10);
         solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
+
+        //System.out.print("CrossFold Val Results: acc" + String.valueOf(tempAccuracy[0]) + " | ");
     }
 }
