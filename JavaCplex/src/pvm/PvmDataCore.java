@@ -4,7 +4,6 @@ import util.RandomUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created with IntelliJ IDEA.
@@ -22,6 +21,7 @@ public class PvmDataCore {
     public double [] alphas;
     public double [] sigmas;
     public double offsetB;
+    public double ePos, eNeg, sigPos, sigNeg;
     public static double doubleEps = 1e-10;
 
 
@@ -205,22 +205,29 @@ public class PvmDataCore {
     }
 
     public void recomputeHyperplaneBias(double [] resT){
+        recomputeHyperplaneBias(resT, 1.0);
+    }
+
+    public void recomputeHyperplaneBias(double [] resT, double positiveTrainBias){
         int i;
-        double sigmaPos = 0, sigmaNeg = 0, ksumPos = 0, ksumNeg = 0;
+        double ksumPos = 0, ksumNeg = 0;
+
+        sigPos = 0;
+        sigNeg = 0;
 
         offsetB = 0.0;
 
         assert(xPos.length > 1 && xNeg.length > 1);
 
         for (i = 0; i < xPos.length; i++)
-            sigmaPos += sigmas[xPos[i]];
+            sigPos += sigmas[xPos[i]];
 
-        sigmaPos /= (double)(xPos.length - 1);
+        sigPos /= (double)(xPos.length - 1);
 
         for (i = 0; i < xNeg.length; i++)
-            sigmaNeg += sigmas[xNeg[i]];
+            sigNeg += sigmas[xNeg[i]];
 
-        sigmaNeg /= (double)(xNeg.length - 1);
+        sigNeg /= (double)(xNeg.length - 1);
 
         for (i = 0; i < alphas.length; i++)
         {
@@ -228,16 +235,19 @@ public class PvmDataCore {
             ksumNeg += alphas[i] * kneg[i];
         }
 
-        if (sigmaPos < doubleEps && sigmaNeg < doubleEps)
+        if (sigPos < doubleEps && sigNeg < doubleEps)
         {
-            offsetB = -(ksumPos + ksumNeg) / 2;
+            offsetB = -(ksumPos + ksumNeg) / (1 + positiveTrainBias);
             resT[0] = 0.0;
         }
         else
         {
-            offsetB = - (sigmaPos * ksumNeg + sigmaNeg * ksumPos) / (sigmaPos + sigmaNeg);
-            resT[0] = sigmaPos / (ksumPos + offsetB);
+            offsetB = - (positiveTrainBias * sigPos * ksumNeg + sigNeg * ksumPos) / (positiveTrainBias * sigPos + sigNeg);
+            resT[0] = sigPos / (ksumPos + offsetB);
         }
+
+        ePos = ksumPos + offsetB;
+        eNeg = ksumNeg + offsetB;
     }
 
     private int [] getLabelCopiesPos(){
@@ -313,7 +323,38 @@ public class PvmDataCore {
         return resCore;
     }
 
-    public boolean classify(PvmEntry src){
+    public double[] getNormalizedSignedDistancesPos(){
+        double ret[] = new double[xPos.length];
+
+        for (int i = 0; i < xPos.length; i++)
+            ret[i] = getNormalizedSignedDistance(entries.get(xPos[i]));
+
+        return ret;
+    }
+
+    public double[] getNormalizedSignedDistancesNeg(){
+        double ret[] = new double[xNeg.length];
+
+        for (int i = 0; i < xNeg.length; i++)
+            ret[i] = getNormalizedSignedDistance(entries.get(xNeg[i]));
+
+        return ret;
+    }
+
+    public double getNormalizedSignedDistance(PvmEntry src){
+        if (src.label){
+            if (sigPos < doubleEps)
+                return 1e+30;
+
+            return (getSignedDistance(src) - ePos) / sigPos;
+        }
+        if (sigNeg < doubleEps)
+            return 1e+30;
+
+        return (getSignedDistance(src) - eNeg) / sigNeg;
+    }
+
+    public double getSignedDistance(PvmEntry src){
         int i;
         double sum = offsetB;
 
@@ -327,7 +368,12 @@ public class PvmDataCore {
             sum += alphas[i] * KerProduct.ComputeKerProd(src, entries.get(i));
         }
 
-        return sum < 0 ? false : true;
+        return sum;
+    }
+
+    public boolean classify(PvmEntry src){
+
+        return getSignedDistance(src) < 0 ? false : true;
     }
 
 }

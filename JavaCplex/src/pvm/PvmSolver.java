@@ -4,6 +4,8 @@ import dsolve.LocalSolver;
 import ilog.concert.IloException;
 import sun.awt.geom.Crossings;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -113,6 +115,24 @@ public class PvmSolver {
         return ret;
     }
 
+    public boolean TrainSingleLPWithBias(double positiveBias) throws IloException {
+        boolean ret;
+        double [] resT = new double[1];
+
+        core.Init();
+        pvmSys.buildSingleLPSystemWithBias(core, positiveBias);
+        ret = pvmSys.solveSingleLPWithBias(resT, positiveBias);
+
+        if (ret && resT[0] == 0.0)
+        {
+            pvmSys.buildSecondaryLpSystem(core);
+            ret = pvmSys.solveSingleLPSecondary(resT, positiveBias);
+        }
+
+        //assert(core.CheckResult(resT, false));
+        return ret;
+    }
+
     public boolean classify(PvmEntry src){
         return core.classify(src);
     }
@@ -164,7 +184,7 @@ public class PvmSolver {
         accuracy[0] = (double)(tp + tn) / (double)(entries.size());
     }
 
-    public void performCrossFoldValidation(int splitCount, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
+    public void performCrossFoldValidationWithPositiveTrainBias(int splitCount, double positiveTrainBias, double accuracy[], double sensitivity[], double specificity[]) throws IloException{
         int i, solvesCount = 0;
         core.Init(false);
 
@@ -193,7 +213,7 @@ public class PvmSolver {
             tempCores.remove(i);
             localSlv.core = PvmDataCore.mergeCores(tempCores);
 
-            if (!localSlv.TrainSingleLP())
+            if (!localSlv.TrainSingleLPWithBias(positiveTrainBias))
                 continue;
 
             solvesCount++;
@@ -212,6 +232,51 @@ public class PvmSolver {
             sensitivity[0] /= (double)solvesCount;
             specificity[0] /= (double)solvesCount;
         }
+
+        return;
+    }
+
+    public void performCrossFoldValidation(int splitCount, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
+        performCrossFoldValidationWithPositiveTrainBias(splitCount, 1.0, accuracy, sensitivity, specificity);
+    }
+
+    public void searchPositiveTrainBias(int splitCount) throws IloException{
+        double bestTrainBias = 0.1, tempTrainBias;
+        double bestAcc = 0.0;
+
+        double tempAccuracy[] = new double[1];
+        double tempSensitivity[] = new double[1];
+        double tempSpecificity[] = new double[1];
+
+        double cpow, first_pow, last_pow;
+
+        first_pow = -2;
+        last_pow = 2;
+        for (cpow = first_pow; cpow < last_pow; cpow += 0.2){
+            tempTrainBias = Math.exp(cpow);
+
+            performCrossFoldValidationWithPositiveTrainBias(splitCount, tempTrainBias,tempAccuracy, tempSensitivity, tempSpecificity);
+
+            if (bestAcc < tempAccuracy[0]){
+                bestAcc = tempAccuracy[0];
+                bestTrainBias = tempTrainBias;
+            }
+        }
+
+        first_pow = bestTrainBias - 0.4;
+        last_pow = bestTrainBias + 0.4;
+
+        for (cpow = first_pow; cpow < last_pow; cpow += 0.05){
+            tempTrainBias = Math.exp(cpow);
+
+            performCrossFoldValidationWithPositiveTrainBias(splitCount, tempTrainBias,tempAccuracy, tempSensitivity, tempSpecificity);
+
+            if (bestAcc < tempAccuracy[0]){
+                bestAcc = tempAccuracy[0];
+                bestTrainBias = tempTrainBias;
+            }
+        }
+
 
         return;
     }
@@ -269,6 +334,29 @@ public class PvmSolver {
         KerProduct.paramI = bestParamI;
     }
 
+    public void writeNormalizedDistancesToFiles(String fileNamePos, String fileNameNeg) throws IloException, IOException {
+        int i;
+        if (!TrainSingleLP())
+            return;
+
+        double distancesPos[] = core.getNormalizedSignedDistancesPos();
+        FileWriter fw = new FileWriter(new File(fileNamePos));
+
+        for (i = 0; i < distancesPos.length; i++)
+            fw.write(String.valueOf(distancesPos[i]) + "\n");
+
+        fw.close();
+
+
+        double distancesNeg[] = core.getNormalizedSignedDistancesNeg();
+        fw = new FileWriter(new File(fileNameNeg));
+
+        for (i = 0; i < distancesNeg.length; i++)
+            fw.write(String.valueOf(distancesNeg[i]) + "\n");
+
+        fw.close();
+    }
+
     public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException {
 
         if (args.length < 1)
@@ -294,14 +382,26 @@ public class PvmSolver {
         boolean labels[] = solver.classify(solver.core.entries);
         solver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
         */
+        /*
+        solver.writeNormalizedDistancesToFiles(args[0] + ".dstP", args[0] + ".dstN");
 
         solver.TrainSingleLP();
         boolean retLabels[] = solver.classify(solver.core.entries);
         PvmSolver.computeAccuracy(retLabels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
+         */
+/*        KerProduct.kerType = KerProduct.KerType.KERRBF;
 
+        int last_i = KerProduct.getParamDMaxStepsCount();
+        for (int i = 0; i < last_i; i++){
+            KerProduct.paramD = KerProduct.getParamDValue(i, last_i);
+            solver.searchPositiveTrainBias(5);
+        }
+  */
+        KerProduct.kerType = KerProduct.KerType.KERSCALAR;
+        solver.searchPositiveTrainBias(5);
 
-        solver.searchKernel(10);
-        solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
+        //solver.searchKernel(10);
+        //solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
 
         //System.out.print("CrossFold Val Results: acc" + String.valueOf(tempAccuracy[0]) + " | ");
     }
