@@ -125,6 +125,11 @@ public class FileFormatConverter {
             ret.add(strLine.split(separator));
         }
 
+        for (String[] rec:ret)
+            for (int i = 0; i < rec.length - 1; i++)
+                if (rec[i].contentEquals("0"))
+                    rec[i] = "";
+
         return ret;
     }
 
@@ -198,9 +203,13 @@ public class FileFormatConverter {
 
     public static void main(String[] args ) throws IOException {
 
-        if (args.length < 3)
+        if (args.length < 2)
             return;
 
-        convertNumericalAndCategoricalToPvmFormat(args[0], args[1]);
+        if (args.length == 2)
+            convertNumericalAndCategoricalToPvmFormat(args[0], args[1]);
+        else if (args.length == 4)
+            convertNumericalAndCategoricalToPvmFormat(args[0], args[1], args[2], Boolean.valueOf(args[3]));
+
     }
 }

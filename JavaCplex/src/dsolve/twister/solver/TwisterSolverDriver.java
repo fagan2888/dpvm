@@ -17,17 +17,20 @@ import java.util.List;
 public class TwisterSolverDriver {
 
 	Logger logger = null;
+	private static final String TWISTER_APPS_DIR = "/work/twister/apps";
+	private static final String TWISTER_LOGS_DIR = "/work/twister/job-log/";
+
+	public static final String TWSITER_APPS_DIR_CONFIG = "dpvm.twister.job.appsfolder";
 
 	public static void main( String[] args ) throws TwisterException, IOException {
 		if ( args.length != 3 ) {
-			System.out.println( "Usage:[partition File][num maps][num reducers]" );
+			System.out.println( "Usage:[paritionFile] [num maps] [num reducers]" );
 			System.exit( -1 );
 		}
 
-		String partitionFile = args[ 0 ];
+		String partitionFile = args[0];
 		int mapperCount = Integer.parseInt( args[ 1 ] );
 		int reducerCount = Integer.parseInt( args[ 2 ] );
-
 
 		TwisterSolverDriver twisterDebugDriver = new TwisterSolverDriver();
 
@@ -48,7 +51,8 @@ public class TwisterSolverDriver {
 
 		// define shared properties
 		Hashtable<String, String> properties = new Hashtable<String, String>();
-		properties.put( TwisterLogger.JOB_LOGGER_FOLDER_PROP, "/work/twister/job-log/" + jobConf.getJobId() );
+		properties.put( TwisterLogger.JOB_LOGGER_FOLDER_PROP, TWISTER_LOGS_DIR + jobConf.getJobId() );
+		properties.put( TWSITER_APPS_DIR_CONFIG, TWISTER_APPS_DIR );
 		jobConf.setProperties( properties );
 
 		logger = new TwisterLogger().fromDriverConfig( jobConf );
@@ -63,8 +67,8 @@ public class TwisterSolverDriver {
 
 		TwisterDriver driver = new TwisterDriver( jobConf );
 
-		driver.configureMaps( "/work/twister-data", "solver" );
-		//driver.configureMaps( partitionFile );
+		//driver.configureMaps( "/work/twister-data", "global-model-block" );
+		driver.configureMaps( partitionFile );
 
 		int maxIterCount = 1000;
 		int currentIter = 0;
@@ -79,14 +83,23 @@ public class TwisterSolverDriver {
 		} catch ( IloException e ) {
 			e.printStackTrace();
 		}
+		logger.info( "objective: " + objective );
 
 		while ( true ) {
 
 			// run the engine
 			driver.runMapReduceBCast( objective ).monitorTillCompletion();
+			logger.info( "iteration: " + currentIter + " finished; combining results");
 
 			// get the results
 			solutions = ( (TwisterSolverCombiner) driver.getCurrentCombiner() ).getSolutions();
+
+			for ( NamedCoordList sol : solutions ) {
+				if ( sol.isEmpty() ) {
+					logger.error( "we received an empty solution; aborting everthing" );
+					break;
+				}
+			}
 
 			objective = SolverHelper.adjustCurrentObjective( objective, solutions );
 			distance2Objective = SolverHelper.computeDistance( objective, solutions );

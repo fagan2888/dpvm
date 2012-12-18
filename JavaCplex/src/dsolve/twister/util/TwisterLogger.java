@@ -17,7 +17,7 @@ import static java.util.Collections.*;
 
 public class TwisterLogger {
 
-    public static final String JOB_LOGGER_FOLDER_PROP = "dpvm.twister.job.sharedfolder";
+    public static final String JOB_LOGGER_FOLDER_PROP = "dpvm.twister.job.logfolder";
 
     private void formattedWrite( Writer writer, String format, String... args ) throws IOException {
         String line = String.format( format, (Object[])args );
@@ -30,7 +30,6 @@ public class TwisterLogger {
         Enumeration nets = NetworkInterface.getNetworkInterfaces();
         NetworkInterface eth0 = (NetworkInterface) nets.nextElement();
         Enumeration inetAddresses = eth0.getInetAddresses();
-        InetAddress ip = (InetAddress) inetAddresses.nextElement();
 
         for ( Object inetObject : list(inetAddresses) ) {
             InetAddress inet = ( InetAddress ) inetObject;

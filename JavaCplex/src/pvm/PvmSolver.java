@@ -2,7 +2,10 @@ package pvm;
 
 import dsolve.LocalSolver;
 import ilog.concert.IloException;
+import sun.awt.geom.Crossings;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -51,7 +54,7 @@ public class PvmSolver {
 
         double [] resT = new double[1];
         resT[0] = t_r;
-        if (!core.CheckResult(resT, true, true))
+        if (!core.CheckResult(resT, true))
             return false;
 
         return true;
@@ -87,7 +90,7 @@ public class PvmSolver {
 
         double [] resT = new double[1];
         resT[0] = t_r;
-        if (!core.CheckResult(resT, true, true))
+        if (!core.CheckResult(resT, true))
             return false;
 
         return true;
@@ -105,11 +108,28 @@ public class PvmSolver {
         {
             pvmSys.buildSecondaryLpSystem(core);
             ret = pvmSys.solveSingleLPSecondary(resT);
-            assert core.CheckResult(resT, false, false);
             //ret = pvmSys.solveSingleLP(resT);
         }
 
         //assert(core.CheckResult(resT, false, true));
+        return ret;
+    }
+
+    public boolean TrainSingleLPWithBias(double positiveBias) throws IloException {
+        boolean ret;
+        double [] resT = new double[1];
+
+        core.Init();
+        pvmSys.buildSingleLPSystemWithBias(core, positiveBias);
+        ret = pvmSys.solveSingleLPWithBias(resT, positiveBias);
+
+        if (ret && resT[0] == 0.0)
+        {
+            pvmSys.buildSecondaryLpSystem(core);
+            ret = pvmSys.solveSingleLPSecondary(resT, positiveBias);
+        }
+
+        //assert(core.CheckResult(resT, false));
         return ret;
     }
 
@@ -268,6 +288,29 @@ public class PvmSolver {
         KerProduct.paramI = bestParamI;
     }
 
+    public void writeNormalizedDistancesToFiles(String fileNamePos, String fileNameNeg) throws IloException, IOException {
+        int i;
+        if (!TrainSingleLP())
+            return;
+
+        double distancesPos[] = core.getNormalizedSignedDistancesPos();
+        FileWriter fw = new FileWriter(new File(fileNamePos));
+
+        for (i = 0; i < distancesPos.length; i++)
+            fw.write(String.valueOf(distancesPos[i]) + "\n");
+
+        fw.close();
+
+
+        double distancesNeg[] = core.getNormalizedSignedDistancesNeg();
+        fw = new FileWriter(new File(fileNameNeg));
+
+        for (i = 0; i < distancesNeg.length; i++)
+            fw.write(String.valueOf(distancesNeg[i]) + "\n");
+
+        fw.close();
+    }
+
     public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException {
 
         if (args.length < 1)
@@ -280,6 +323,7 @@ public class PvmSolver {
         KerProduct.paramI = 3;
         */
 
+
         solver.core.ReadFile(args[0]);
         //solver.Train();
         //solver.TrainDistributed();
@@ -288,21 +332,32 @@ public class PvmSolver {
         double tempSensitivity[] = new double[1];
         double tempSpecificity[] = new double[1];
 
-//        KerProduct.kerType = KerProduct.KerType.KERSCALAR;
-            /*
-        KerProduct.kerType = KerProduct.KerType.KERRBF;
+          /*
+        solver.TrainSingleLP();
+        boolean labels[] = solver.classify(solver.core.entries);
+        solver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
+        */
+        /*
+        solver.writeNormalizedDistancesToFiles(args[0] + ".dstP", args[0] + ".dstN");
 
-        KerProduct.paramD = Math.pow(2, -17);
-        KerProduct.setKerScaling(100.0);
-        //KerProduct.paramI = 2;
+        solver.TrainSingleLP();
+        boolean retLabels[] = solver.classify(solver.core.entries);
+        PvmSolver.computeAccuracy(retLabels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
+         */
+/*        KerProduct.kerType = KerProduct.KerType.KERRBF;
 
-        if (solver.TrainSingleLP()){
-            boolean labels[] = solver.classify(solver.core.entries);
-            PvmSolver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
-        } */
+        int last_i = KerProduct.getParamDMaxStepsCount();
+        for (int i = 0; i < last_i; i++){
+            KerProduct.paramD = KerProduct.getParamDValue(i, last_i);
+            solver.searchPositiveTrainBias(5);
+        }
+  */
+        KerProduct.kerType = KerProduct.KerType.KERSCALAR;
+        solver.searchPositiveTrainBias(5);
 
-        solver.searchKernel(5);
-
+        //solver.searchKernel(10);
         //solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
+
+        //System.out.print("CrossFold Val Results: acc" + String.valueOf(tempAccuracy[0]) + " | ");
     }
 }

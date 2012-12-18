@@ -46,9 +46,6 @@ public class PvmSystem {
             return false;
         }
 
-
-
-
         core = pvms;
         baseCount = core.entries.size();
 
@@ -707,6 +704,27 @@ public class PvmSystem {
         obj = cplex.addMaximize(lin);
     }
 
+    public boolean buildSingleLPSystemWithBias(PvmDataCore pvms, double positiveBias) throws IloException {
+        cleanCplex();
+        addCplexSolver(false);
+
+        core = pvms;
+        baseCount = core.entries.size();
+
+        rngConstraints = new IloRange[baseCount * 2 + 1];
+
+        if (!CreateVariables(false, false, Double.MAX_VALUE))
+            return false;
+
+        if (!AddSigmaRegularConstraints())
+            return false;
+
+        setDenominatorUnityEqualityConstraint(baseCount * 2);
+        setSingleLPTypeObjectiveWithBias(positiveBias);
+
+        return true;
+    }
+
     public boolean buildSingleLPSystem(PvmDataCore pvms, boolean saveSys, boolean nameAllVars, boolean nameAllConstraints) throws IloException {
 
         addCplexSolver(false);
@@ -740,8 +758,7 @@ public class PvmSystem {
         return true;
     }
 
-    public boolean solveSingleLP(double [] resT) throws IloException {
-
+    public boolean solveSingleLPWithBias(double [] resT, double positiveTrainBias) throws IloException {
         int i, sigIdx;
 
         if (!cplex.solve())
@@ -757,11 +774,21 @@ public class PvmSystem {
         for (i = 0; i < baseCount; i++)
             core.sigmas[i] = x[i + baseCount];
 
-        return core.recomputeHyperplaneBias(resT);
+        core.recomputeHyperplaneBias(resT, positiveTrainBias);
+
+        return true;
     }
 
-    public boolean solveSingleLPSecondary(double [] resT) throws IloException {
-        int i;
+    public boolean solveSingleLP(double [] resT) throws IloException {
+        return solveSingleLPWithBias(resT, 1.0);
+    }
+
+    public boolean solveSingleLPSecondary(double [] resT) throws IloException{
+        return solveSingleLPSecondary(resT, 1.0);
+    }
+
+    public boolean solveSingleLPSecondary(double [] resT, double positiveTrainBias) throws IloException {
+        int i, sigIdx;
 
         if (!cplex.solve())
             return false;
@@ -776,7 +803,10 @@ public class PvmSystem {
         for (i = 0; i < baseCount; i++)
             core.sigmas[i] = 0;
 
-        return core.recomputeHyperplaneBias(resT);
+        core.recomputeHyperplaneBias(resT, positiveTrainBias);
+
+        return true;
+
     }
 
     private void CreateSecondaryConstrainedVariables(double constrainedAlphasLimit) throws IloException {
@@ -839,6 +869,17 @@ public class PvmSystem {
         setSingleLPTypeObjectiveInverse();
 
         return true;
+    }
+
+    protected void addUnitSphereConstraint() throws IloException {
+        //todo
+
+        IloLQNumExpr sphereConstraint = cplex.lqNumExpr();
+
+        for (int i = 0; i < baseCount; i++)
+            sphereConstraint.addTerm(1.0, vars[i], vars[i]);
+
+        cplex.addLe(sphereConstraint, 1.0);
     }
 
     private void cleanCplex() throws IloException {

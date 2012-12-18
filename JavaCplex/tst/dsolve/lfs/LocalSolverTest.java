@@ -33,7 +33,7 @@ public class LocalSolverTest {
         int dimensions = 5;
 		int blocks = 1;
 
-		SolverHelper.dropNativeCplex();
+		SolverHelper.dropNativeCplex( "." );
 
 		GlobalModelBuilder modelBuilder = new GlobalModelBuilder();
 		String generatedFileName = LfsTestUtils.generateRandomInput( records, dimensions, null );
@@ -52,9 +52,5 @@ public class LocalSolverTest {
 			Assert.assertTrue( "Localsolver didn't manage to solve the most simple system ever", localSolver.runSolver() );
 			printSolution( localSolver.getSolution() );
 		}
-	}
-
-	public static void main( String[] args ) throws IloException, IOException, URISyntaxException {
-		new LocalSolverTest().testLocalSolverWithRandomFeasibleSystem();
 	}
 }

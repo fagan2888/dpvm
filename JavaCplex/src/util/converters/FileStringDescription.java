@@ -230,7 +230,7 @@ public class FileStringDescription {
         else{
             i = 0;
             last_i--;
-            retStrings[0] = String.valueOf(getCategoricalIndex(srcStr[last_i], 0));
+            retStrings[0] = String.valueOf(getCategoricalIndex(srcStr[last_i], last_i));
         }
 
         cidx = 1;
