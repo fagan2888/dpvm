@@ -54,7 +54,7 @@ public class PvmSolver {
 
         double [] resT = new double[1];
         resT[0] = t_r;
-        if (!core.CheckResult(resT, true))
+        if (!core.CheckResult(resT, true, true))
             return false;
 
         return true;
@@ -90,7 +90,7 @@ public class PvmSolver {
 
         double [] resT = new double[1];
         resT[0] = t_r;
-        if (!core.CheckResult(resT, true))
+        if (!core.CheckResult(resT, true, true))
             return false;
 
         return true;
@@ -129,7 +129,7 @@ public class PvmSolver {
             ret = pvmSys.solveSingleLPSecondary(resT, positiveBias);
         }
 
-        //assert(core.CheckResult(resT, false));
+        //assert(core.CheckResult(resT, false, false));
         return ret;
     }
 
@@ -309,6 +309,12 @@ public class PvmSolver {
             fw.write(String.valueOf(distancesNeg[i]) + "\n");
 
         fw.close();
+    }
+
+    public void searchPositiveTrainBias(int splitCount){
+        //todo : rewrite this function to fill in the code which was lost when merging branches
+
+
     }
 
     public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException {

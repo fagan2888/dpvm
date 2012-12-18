@@ -655,10 +655,10 @@ public class PvmSystem {
         rngConstraints[rngIdx] = cplex.addEq(1.0, lin, "UnityEq");
     }
 
-    private void setSingleLPTypeObjective() throws IloException {
+    private void setSingleLPTypeObjectiveWithBias(double positiveBias) throws IloException {
         int i;
         IloLinearNumExpr lin;
-        double posTerm = core.xNeg.length - 1, negTerm = core.xPos.length - 1;
+        double posTerm = positiveBias * (core.xNeg.length - 1), negTerm = core.xPos.length - 1;
 
         assert(posTerm > 0 && negTerm > 0);
 
@@ -670,6 +670,10 @@ public class PvmSystem {
             lin.addTerm(negTerm, vars[core.xNeg[i] + baseCount]);
 
         obj = cplex.addMinimize(lin);
+    }
+
+    private void setSingleLPTypeObjective() throws IloException {
+        setSingleLPTypeObjectiveWithBias(1.0);
     }
 
     private void setDenominatorEqualityConstraintInverse(int rngIdx, boolean setToZero) throws IloException{
@@ -866,13 +870,13 @@ public class PvmSystem {
 
         CreateSecondaryConstrainedVariables(1.0);
         AddSigmaVoidConstraints();
+        addUnitSphereConstraint();
         setSingleLPTypeObjectiveInverse();
 
         return true;
     }
 
     protected void addUnitSphereConstraint() throws IloException {
-        //todo
 
         IloLQNumExpr sphereConstraint = cplex.lqNumExpr();
 
