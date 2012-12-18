@@ -51,7 +51,7 @@ public class PvmSolver {
 
         double [] resT = new double[1];
         resT[0] = t_r;
-        if (!core.CheckResult(resT, true))
+        if (!core.CheckResult(resT, true, true))
             return false;
 
         return true;
@@ -87,7 +87,7 @@ public class PvmSolver {
 
         double [] resT = new double[1];
         resT[0] = t_r;
-        if (!core.CheckResult(resT, true))
+        if (!core.CheckResult(resT, true, true))
             return false;
 
         return true;
@@ -105,10 +105,11 @@ public class PvmSolver {
         {
             pvmSys.buildSecondaryLpSystem(core);
             ret = pvmSys.solveSingleLPSecondary(resT);
+            assert core.CheckResult(resT, false, false);
             //ret = pvmSys.solveSingleLP(resT);
         }
 
-        assert(core.CheckResult(resT, false));
+        //assert(core.CheckResult(resT, false, true));
         return ret;
     }
 
@@ -287,12 +288,21 @@ public class PvmSolver {
         double tempSensitivity[] = new double[1];
         double tempSpecificity[] = new double[1];
 
-          /*
-        solver.TrainSingleLP();
-        boolean labels[] = solver.classify(solver.core.entries);
-        solver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
-        */
+//        KerProduct.kerType = KerProduct.KerType.KERSCALAR;
+            /*
+        KerProduct.kerType = KerProduct.KerType.KERRBF;
+
+        KerProduct.paramD = Math.pow(2, -17);
+        KerProduct.setKerScaling(100.0);
+        //KerProduct.paramI = 2;
+
+        if (solver.TrainSingleLP()){
+            boolean labels[] = solver.classify(solver.core.entries);
+            PvmSolver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
+        } */
+
         solver.searchKernel(5);
-        solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
+
+        //solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
     }
 }

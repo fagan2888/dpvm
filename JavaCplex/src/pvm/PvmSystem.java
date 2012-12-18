@@ -38,15 +38,16 @@ public class PvmSystem {
     IterativeGlobalSolver globalSolver = null;
 
     public boolean BuildSystemFor(PvmDataCore pvms, double t, boolean saveSys, boolean nameAllConstraints){
-        cplex = null;
-        try
-        {
-            cplex = new IloCplex();
+
+        try {
+            addCplexSolver(false);
         }
-        catch (ilog.concert.IloException e)
-        {
+        catch (IloException e){
             return false;
         }
+
+
+
 
         core = pvms;
         baseCount = core.entries.size();
@@ -708,7 +709,6 @@ public class PvmSystem {
 
     public boolean buildSingleLPSystem(PvmDataCore pvms, boolean saveSys, boolean nameAllVars, boolean nameAllConstraints) throws IloException {
 
-        cleanCplex();
         addCplexSolver(false);
 
         core = pvms;
@@ -757,13 +757,11 @@ public class PvmSystem {
         for (i = 0; i < baseCount; i++)
             core.sigmas[i] = x[i + baseCount];
 
-        core.recomputeHyperplaneBias(resT);
-
-        return true;
+        return core.recomputeHyperplaneBias(resT);
     }
 
     public boolean solveSingleLPSecondary(double [] resT) throws IloException {
-        int i, sigIdx;
+        int i;
 
         if (!cplex.solve())
             return false;
@@ -778,10 +776,7 @@ public class PvmSystem {
         for (i = 0; i < baseCount; i++)
             core.sigmas[i] = 0;
 
-        core.recomputeHyperplaneBias(resT);
-
-        return true;
-
+        return core.recomputeHyperplaneBias(resT);
     }
 
     private void CreateSecondaryConstrainedVariables(double constrainedAlphasLimit) throws IloException {
@@ -832,7 +827,6 @@ public class PvmSystem {
 
     public boolean buildSecondaryLpSystem (PvmDataCore pvms) throws IloException {
 
-        cleanCplex();
         addCplexSolver(false);
 
         core = pvms;
@@ -862,13 +856,20 @@ public class PvmSystem {
     }
 
     private void addCplexSolver(boolean verbalize) throws IloException {
+
+        cleanCplex();
+
         cplex = null;
         cplex = new IloCplex();
 
         if (!verbalize)
             cplex.setOut(null);
-                                                       /*
-        cplex.setParam(IloCplex.IntParam.ParallelMode, 1);
-        cplex.setParam(IloCplex.IntParam.Threads, 1);*/
+
+
+        cplex.setParam(IloCplex.BooleanParam.NumericalEmphasis, true);
+
+        cplex.setParam(IloCplex.IntParam.Threads, 2);
+        cplex.setParam(IloCplex.IntParam.ParallelMode, 0);
+
     }
 }

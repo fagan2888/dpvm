@@ -16,6 +16,7 @@ public class KerProduct {
     public static KerType kerType = KerType.KERSCALAR;
     public static double paramD = 1.0;
     public static int paramI = 1;
+    protected static double kerScaling = 1.0;
 
     private static int minParamI = 1;
     private static int maxParamI = 7;
@@ -27,12 +28,16 @@ public class KerProduct {
     {
         switch (kerType)
         {
-            case KERSCALAR: return ComputeKerProdScalar(e0, e1);
-            case KERPOLY: return ComputeKerProdPoly(e0, e1);
-            case KERRBF: return ComputeKerProdRbf(e0, e1);
+            case KERSCALAR: return kerScaling * ComputeKerProdScalar(e0, e1);
+            case KERPOLY: return kerScaling * ComputeKerProdPoly(e0, e1);
+            case KERRBF: return kerScaling * ComputeKerProdRbf(e0, e1);
 
-            default: return ComputeKerProdScalar(e0, e1);
+            default: return kerScaling * ComputeKerProdScalar(e0, e1);
         }
+    }
+
+    public static void setKerScaling(double kerScaling1){
+        kerScaling = kerScaling1;
     }
 
     public static int getMinParamI(){
@@ -112,7 +117,7 @@ public class KerProduct {
     }
 
     public static double ComputeKerProdPoly(PvmEntry e0, PvmEntry e1){
-        return Math.pow(ComputeKerProdScalar(e0, e1) + paramD, paramI);
+        return Math.pow((ComputeKerProdScalar(e0, e1) + paramD), paramI);
     }
 
     public static double ComputeKerProdRbf(PvmEntry e0, PvmEntry e1){

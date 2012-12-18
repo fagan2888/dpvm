@@ -23,6 +23,7 @@ public class PvmDataCore {
     public double [] sigmas;
     public double offsetB;
     public static double doubleEps = 1e-10;
+    public static double doubleFloat = 1e-4;
 
 
     public PvmDataCore(){
@@ -138,7 +139,7 @@ public class PvmDataCore {
         }
     }
 
-    public boolean CheckResult(double [] resT, boolean useFixedAverageThresh){
+    public boolean CheckResult(double [] resT, boolean useFixedAverageThresh, boolean checkAverages){
         int i, j;
         double epos = offsetB, eneg = offsetB;
         double localDist, localSigma;
@@ -152,11 +153,13 @@ public class PvmDataCore {
         for (i = 0; i < kneg.length; i++)
             eneg += alphas[i] * kneg[i];
 
-        if (useFixedAverageThresh && (epos < 1.0 - doubleEps || -eneg < 1.0 - doubleEps))
-            return false;
+        if (checkAverages){
+            if (useFixedAverageThresh && (epos < 1.0 - doubleEps || -eneg < 1.0 - doubleEps))
+                return false;
 
-        if (!useFixedAverageThresh && (epos < doubleEps || -eneg < doubleEps))
-            return false;
+            if (!useFixedAverageThresh && (epos < doubleEps || -eneg < doubleEps))
+                return false;
+        }
 
         //then compute the deviation of the distance associated with each record and see if it checks out
 
@@ -175,7 +178,7 @@ public class PvmDataCore {
             if (localSigma < 0)
                 localSigma = -localSigma;
 
-            if (localSigma > sigmas[i] + doubleEps)
+            if (localSigma > sigmas[i] + doubleFloat)
                 return false;
         }
 
@@ -191,10 +194,10 @@ public class PvmDataCore {
         assert(xNeg.length > 1);
         sigmaNeg /= (double)(xNeg.length - 1);
 
-        if (sigmaPos / epos > resT[0] + doubleEps)
+        if (sigmaPos / epos > resT[0] + doubleFloat)
             return false;
 
-        if (- sigmaNeg / eneg > resT[0] + doubleEps)
+        if (- sigmaNeg / eneg > resT[0] + doubleFloat)
             return false;
 
         resT[0] = sigmaPos / epos;
@@ -204,7 +207,7 @@ public class PvmDataCore {
         return true;
     }
 
-    public void recomputeHyperplaneBias(double [] resT){
+    public boolean recomputeHyperplaneBias(double [] resT){
         int i;
         double sigmaPos = 0, sigmaNeg = 0, ksumPos = 0, ksumNeg = 0;
 
@@ -238,6 +241,10 @@ public class PvmDataCore {
             offsetB = - (sigmaPos * ksumNeg + sigmaNeg * ksumPos) / (sigmaPos + sigmaNeg);
             resT[0] = sigmaPos / (ksumPos + offsetB);
         }
+
+        //assert CheckResult(resT, false);
+        return true;
+
     }
 
     private int [] getLabelCopiesPos(){
