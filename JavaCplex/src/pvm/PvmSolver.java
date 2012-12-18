@@ -19,6 +19,7 @@ import java.util.ArrayList;
 public class PvmSolver {
     public PvmDataCore core;
     public PvmSystem pvmSys;
+    public static int maximumPositiveTrainBias = 10;
 
     public PvmSolver(){
         core = new PvmDataCore();
@@ -184,7 +185,7 @@ public class PvmSolver {
         accuracy[0] = (double)(tp + tn) / (double)(entries.size());
     }
 
-    public void performCrossFoldValidation(int splitCount, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
+    public void performCrossFoldValidationWithBias(int splitCount, double positiveBias, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
         int i, solvesCount = 0;
         core.Init(false);
 
@@ -203,8 +204,7 @@ public class PvmSolver {
 
         accuracy[0] = sensitivity[0] = specificity[0] = 0.0;
 
-        for (i = 0; i < splitCount; i++)
-        {
+        for (i = 0; i < splitCount; i++){
             tempCores.clear();
             tempCores.addAll(splitCores);
 
@@ -213,27 +213,28 @@ public class PvmSolver {
             tempCores.remove(i);
             localSlv.core = PvmDataCore.mergeCores(tempCores);
 
-            if (!localSlv.TrainSingleLP())
+            if (!localSlv.TrainSingleLPWithBias(positiveBias))
                 continue;
 
             solvesCount++;
 
             boolean localLabels[] = localSlv.classify(cTestCore.entries);
-            localSlv.computeAccuracy(localLabels, cTestCore.entries, tempAccuracy, tempSensitivity, tempSpecificity);
+            PvmSolver.computeAccuracy(localLabels, cTestCore.entries, tempAccuracy, tempSensitivity, tempSpecificity);
 
             accuracy[0] += tempAccuracy[0];
             sensitivity[0] += tempSensitivity[0];
             specificity[0] += tempSpecificity[0];
         }
 
-        if (solvesCount > 0)
-        {
+        if (solvesCount > 0){
             accuracy[0] /= (double)solvesCount;
             sensitivity[0] /= (double)solvesCount;
             specificity[0] /= (double)solvesCount;
         }
+    }
 
-        return;
+    public void performCrossFoldValidation(int splitCount, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
+        performCrossFoldValidationWithBias(splitCount, 1.0, accuracy, sensitivity, specificity);
     }
 
     public void searchKernel(int splitCount) throws IloException {
@@ -311,10 +312,37 @@ public class PvmSolver {
         fw.close();
     }
 
-    public void searchPositiveTrainBias(int splitCount){
-        //todo : rewrite this function to fill in the code which was lost when merging branches
+    public double searchPositiveTrainBias(int splitCount) throws IloException {
+        int i;
+        double cPow, maxCPow, bestTrainBias = 1.0, tempTrainBias;
+        double bestAcc = 0.0;
+        double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
 
 
+        for (i = -maximumPositiveTrainBias; i <= maximumPositiveTrainBias; i++){
+            tempTrainBias = Math.pow(2, (double)i);
+
+            performCrossFoldValidationWithBias(splitCount, tempTrainBias, tempAcc, tempSens, tempSpec);
+
+            if (bestAcc < tempAcc[0]){
+                bestAcc = tempAcc[0];
+                bestTrainBias = tempTrainBias;
+            }
+        }
+
+        maxCPow = bestTrainBias + 1.0;
+        for (cPow = bestTrainBias - 1.0; cPow <= maxCPow; cPow += 0.2){
+            tempTrainBias = Math.pow(2, cPow);
+
+            performCrossFoldValidationWithBias(splitCount, tempTrainBias, tempAcc, tempSens, tempSpec);
+
+            if (bestAcc < tempAcc[0]){
+                bestAcc = tempAcc[0];
+                bestTrainBias = tempTrainBias;
+            }
+        }
+
+        return bestTrainBias;
     }
 
     public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException {

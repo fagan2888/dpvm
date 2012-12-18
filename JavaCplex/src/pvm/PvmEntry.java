@@ -9,9 +9,10 @@ import java.util.Vector;
  * Time: 7:59 PM
  */
 
-public class PvmEntry {
+public class PvmEntry implements Comparable{
     public boolean label = false;
     public double [] x = null;
+    public double compareScore;
 
     public void resize( int nsize ) {
         int i;
@@ -21,5 +22,19 @@ public class PvmEntry {
             nx[i] = x[i];
 
         x = nx;
+    }
+
+    @Override
+    public int compareTo(Object o) {
+        if (o.getClass() != PvmEntry.class)
+            return 1;
+
+        PvmEntry other = (PvmEntry)o;
+
+        if (compareScore < other.compareScore)
+            return -1;
+        else if (compareScore > other.compareScore)
+            return 1;
+        return 0;
     }
 }

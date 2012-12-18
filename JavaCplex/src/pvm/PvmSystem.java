@@ -763,7 +763,7 @@ public class PvmSystem {
     }
 
     public boolean solveSingleLPWithBias(double [] resT, double positiveTrainBias) throws IloException {
-        int i, sigIdx;
+        int i;
 
         if (!cplex.solve())
             return false;

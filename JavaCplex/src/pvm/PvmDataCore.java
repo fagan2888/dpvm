@@ -4,6 +4,7 @@ import util.RandomUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -210,6 +211,28 @@ public class PvmDataCore {
 
     public void recomputeHyperplaneBias(double [] resT){
         recomputeHyperplaneBias(resT, 1.0);
+    }
+
+    protected void computeCurrentEntriesUnbiasedScore(){
+        int i, j;
+
+        assert entries.size() == alphas.length;
+
+        for (i = 0; i < alphas.length; i++){
+            PvmEntry entry = entries.get(i);
+            entry.compareScore = 0.0;
+            for (j = 0; j < alphas.length; j++)
+                entry.compareScore += alphas[j] * gramMtx[i][j];
+        }
+    }
+
+    public void recomputeHyperplaneBiasOptimizingAccuracy(double [] resT){
+        computeCurrentEntriesUnbiasedScore();
+        Collections.sort(entries);
+
+        //todo
+
+
     }
 
     public void recomputeHyperplaneBias(double [] resT, double positiveTrainBias){
