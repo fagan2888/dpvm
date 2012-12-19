@@ -4,8 +4,7 @@ import util.RandomUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Arrays;
 
 /**
  * Created with IntelliJ IDEA.
@@ -24,8 +23,8 @@ public class PvmDataCore {
     public double [] sigmas;
     public double offsetB;
     public double ePos, eNeg, sigPos, sigNeg;
-    public static double doubleEps = 1e-10;
-    public static double doubleFloat = 1e-4;
+    public static double epsDouble = 1e-10;
+    public static double epsFloat = 1e-4;
 
 
     public PvmDataCore(){
@@ -156,10 +155,10 @@ public class PvmDataCore {
             eneg += alphas[i] * kneg[i];
 
         if (checkAverages){
-            if (useFixedAverageThresh && (epos < 1.0 - doubleEps || -eneg < 1.0 - doubleEps))
+            if (useFixedAverageThresh && (epos < 1.0 - epsDouble || -eneg < 1.0 - epsDouble))
                 return false;
 
-            if (!useFixedAverageThresh && (epos < doubleEps || -eneg < doubleEps))
+            if (!useFixedAverageThresh && (epos < epsDouble || -eneg < epsDouble))
                 return false;
         }
 
@@ -180,7 +179,7 @@ public class PvmDataCore {
             if (localSigma < 0)
                 localSigma = -localSigma;
 
-            if (localSigma > sigmas[i] + doubleFloat)
+            if (localSigma > sigmas[i] + epsFloat)
                 return false;
         }
 
@@ -196,10 +195,10 @@ public class PvmDataCore {
         assert(xNeg.length > 1);
         sigmaNeg /= (double)(xNeg.length - 1);
 
-        if (sigmaPos / epos > resT[0] + doubleFloat)
+        if (sigmaPos / epos > resT[0] + epsFloat)
             return false;
 
-        if (- sigmaNeg / eneg > resT[0] + doubleFloat)
+        if (- sigmaNeg / eneg > resT[0] + epsFloat)
             return false;
 
         resT[0] = sigmaPos / epos;
@@ -226,13 +225,101 @@ public class PvmDataCore {
         }
     }
 
-    public void recomputeHyperplaneBiasOptimizingAccuracy(double [] resT){
+    protected int computeIndexSplitMaximizingAccuracy(PvmEntry tempEntries[]){
+        int i, besti = -1;
+        int falsePosCount, falseNegCount, bestFalseCount;
+
+        Arrays.sort(tempEntries);
+
+        falseNegCount = 0;
+        falsePosCount = xNeg.length;
+
+        bestFalseCount = falseNegCount + falsePosCount;
+
+        for (i = 0; i < tempEntries.length; i++){
+            if (tempEntries[i].label)
+                falsePosCount++;
+            else
+                falseNegCount--;
+
+            if (bestFalseCount > falsePosCount + falseNegCount){
+                bestFalseCount = falsePosCount + falseNegCount;
+                besti = i;
+            }
+        }
+
+        return besti;
+
+    }
+
+    public boolean recomputeHyperplaneBiasOptimizingAccuracy(double [] resT){
+        PvmEntry tempEntries[] = new PvmEntry[entries.size()];
         computeCurrentEntriesUnbiasedScore();
-        Collections.sort(entries);
+        int splitIdx = computeIndexSplitMaximizingAccuracy(tempEntries);
 
-        //todo
+        if (splitIdx < 2 || splitIdx > tempEntries.length - 2)
+            return false;
 
 
+        int i, locPosCount = 0, locNegCount = 0, tempCount;
+        double locMedpos = 0, locMedneg = 0, tempLowQ = 0, tempUppQ = 0;
+        double iqrPos, iqrNeg;
+
+
+        for (i = 0; i <= splitIdx; i++){
+            if (!tempEntries[i].label)
+                locNegCount++;
+        }
+
+        tempCount = locNegCount;
+        locNegCount = 0;
+        for (i = 0; i <= splitIdx; i++){
+            if (!tempEntries[i].label)
+                locNegCount++;
+
+            if (locNegCount == tempCount / 4)
+                tempLowQ = tempEntries[i].compareScore;
+            else if (locNegCount == tempCount / 2)
+                locMedneg = tempEntries[i].compareScore;
+            else if (locNegCount == (tempCount * 3) / 4)
+                tempUppQ = tempEntries[i].compareScore;
+        }
+
+        iqrNeg = tempUppQ - tempLowQ;
+        if (iqrNeg < epsDouble)
+            iqrNeg = epsDouble;
+
+
+        for (i = splitIdx + 1; i < tempEntries.length; i++){
+            if (tempEntries[i].label)
+                locPosCount++;
+        }
+
+        tempCount = locPosCount;
+        locPosCount = 0;
+        for (i = splitIdx + 1; i < tempEntries.length; i++){
+            if (tempEntries[i].label)
+                locPosCount++;
+
+            if (locPosCount == tempCount / 4)
+                tempLowQ = tempEntries[i].compareScore;
+            else if (locPosCount == tempCount / 2)
+                locMedpos = tempEntries[i].compareScore;
+            else if (locPosCount == (tempCount * 3) / 4)
+                tempUppQ = tempEntries[i].compareScore;
+        }
+
+        iqrPos = tempUppQ - tempLowQ;
+        if (iqrPos < epsDouble)
+            iqrPos = epsDouble;
+
+        double biasInterval = tempEntries[splitIdx + 1].compareScore - tempEntries[splitIdx].compareScore;
+
+        biasInterval *= (locMedneg / iqrNeg) / ((locMedneg / iqrNeg) + (locMedpos / iqrPos));
+
+        offsetB = - (tempEntries[splitIdx].compareScore + biasInterval);
+
+        return true;
     }
 
     public void recomputeHyperplaneBias(double [] resT, double positiveTrainBias){
@@ -262,7 +349,7 @@ public class PvmDataCore {
             ksumNeg += alphas[i] * kneg[i];
         }
 
-        if (sigPos < doubleEps && sigNeg < doubleEps)
+        if (sigPos < epsDouble && sigNeg < epsDouble)
         {
             offsetB = -(ksumPos + ksumNeg) / (1 + positiveTrainBias);
             resT[0] = 0.0;
@@ -370,12 +457,12 @@ public class PvmDataCore {
 
     public double getNormalizedSignedDistance(PvmEntry src){
         if (src.label){
-            if (sigPos < doubleEps)
+            if (sigPos < epsDouble)
                 return 1e+30;
 
             return (getSignedDistance(src) - ePos) / sigPos;
         }
-        if (sigNeg < doubleEps)
+        if (sigNeg < epsDouble)
             return 1e+30;
 
         return (getSignedDistance(src) - eNeg) / sigNeg;
