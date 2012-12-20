@@ -709,7 +709,6 @@ public class PvmSystem {
     }
 
     public boolean buildSingleLPSystemWithBias(PvmDataCore pvms, double positiveBias) throws IloException {
-        cleanCplex();
         addCplexSolver(false);
 
         core = pvms;
@@ -778,7 +777,8 @@ public class PvmSystem {
         for (i = 0; i < baseCount; i++)
             core.sigmas[i] = x[i + baseCount];
 
-        core.recomputeHyperplaneBias(resT, positiveTrainBias);
+        //core.recomputeHyperplaneBias(resT, positiveTrainBias);
+        core.recomputeHyperplaneBiasOptimizingAccuracy(resT);
 
         return true;
     }
@@ -893,6 +893,7 @@ public class PvmSystem {
             cplex.endModel();
             cplex.end();
         }
+        cplex = null;
     }
 
     @Override
@@ -901,10 +902,7 @@ public class PvmSystem {
     }
 
     private void addCplexSolver(boolean verbalize) throws IloException {
-
         cleanCplex();
-
-        cplex = null;
         cplex = new IloCplex();
 
         if (!verbalize)
@@ -915,6 +913,5 @@ public class PvmSystem {
 
         cplex.setParam(IloCplex.IntParam.Threads, 2);
         cplex.setParam(IloCplex.IntParam.ParallelMode, 0);
-
     }
 }
