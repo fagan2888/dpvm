@@ -225,8 +225,6 @@ public class SolverHelper {
 			libName = "cplex124.dll";
 		}
 
-		listJarFiles( libName );
-
 		URL url = ClassLoader.getSystemResource( libName );
 		InputStream inputStream = null;
 		if ( url != null ) {
@@ -265,5 +263,9 @@ public class SolverHelper {
 
 		addDir2JavaPath( libraryPath.getAbsolutePath() );
 		logger.info( String.format( "library: %s added to java library path env", libraryPath ) );
+	}
+
+	public static void dropNativeCplex() throws IOException, URISyntaxException {
+		dropNativeCplex( "." );
 	}
 }

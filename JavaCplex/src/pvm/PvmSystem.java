@@ -709,6 +709,7 @@ public class PvmSystem {
     }
 
     public boolean buildSingleLPSystemWithBias(PvmDataCore pvms, double positiveBias) throws IloException {
+        cleanCplex();
         addCplexSolver(false);
 
         core = pvms;
@@ -907,13 +908,11 @@ public class PvmSystem {
         cleanCplex();
         cplex = new IloCplex();
 
-        if (!verbalize)
-            cplex.setOut(null);
+        if (!verbalize) { cplex.setOut(null); }
 
+	    cplex.setParam( IloCplex.BooleanParam.NumericalEmphasis, true );
+	    cplex.setParam( IloCplex.IntParam.Threads, 4 );
 
-        cplex.setParam(IloCplex.BooleanParam.NumericalEmphasis, true);
-
-        cplex.setParam(IloCplex.IntParam.Threads, 2);
-        cplex.setParam(IloCplex.IntParam.ParallelMode, 0);
+	    cplex.setParam( IloCplex.IntParam.RootAlg, IloCplex.Algorithm.Dual );
     }
 }

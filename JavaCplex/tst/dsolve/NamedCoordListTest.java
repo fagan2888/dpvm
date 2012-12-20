@@ -33,4 +33,12 @@ public class NamedCoordListTest {
 		Assert.assertEquals( unitInput.get(0), unitOutput.get(0) );
 		Assert.assertEquals( unitInput.get(1), unitOutput.get(1) );
 	}
+
+	private int getA() { return 1; }
+	private int getB() { return 2; }
+
+	@Test
+	public void testAssert() {
+		assert getA() == getB();
+	}
 }

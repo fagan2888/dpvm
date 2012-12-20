@@ -89,7 +89,7 @@ public class TwisterSolverDriver {
 
 			// run the engine
 			driver.runMapReduceBCast( objective ).monitorTillCompletion();
-			logger.info( "iteration: " + currentIter + " finished; combining results");
+			logger.info( "iteration: " + currentIter + " finished; combining results" );
 
 			// get the results
 			solutions = ( (TwisterSolverCombiner) driver.getCurrentCombiner() ).getSolutions();
