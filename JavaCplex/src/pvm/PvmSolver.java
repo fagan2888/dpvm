@@ -352,43 +352,17 @@ public class PvmSolver {
 
         PvmSolver solver = new PvmSolver();
 
-        /*KerProduct.kerType = KerProduct.KerType.KERPOLY;
-        KerProduct.paramD = 0.001;//1.0/32.0;
-        KerProduct.paramI = 3;
-        */
-
-
         solver.core.ReadFile(args[0]);
-        //solver.Train();
-        //solver.TrainDistributed();
 
-        double tempAccuracy[] = new double[1];
-        double tempSensitivity[] = new double[1];
-        double tempSpecificity[] = new double[1];
-
-          /*
-        solver.TrainSingleLP();
-        boolean labels[] = solver.classify(solver.core.entries);
-        solver.computeAccuracy(labels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
-        */
-        /*
-        solver.writeNormalizedDistancesToFiles(args[0] + ".dstP", args[0] + ".dstN");
-
-        solver.TrainSingleLP();
-        boolean retLabels[] = solver.classify(solver.core.entries);
-        PvmSolver.computeAccuracy(retLabels, solver.core.entries, tempAccuracy, tempSensitivity, tempSpecificity);
-         */
-/*        KerProduct.kerType = KerProduct.KerType.KERRBF;
-
-        int last_i = KerProduct.getParamDMaxStepsCount();
-        for (int i = 0; i < last_i; i++){
-            KerProduct.paramD = KerProduct.getParamDValue(i, last_i);
-            solver.searchPositiveTrainBias(5);
-        }
-  */
         KerProduct.kerType = KerProduct.KerType.KERSCALAR;
         solver.searchPositiveTrainBias(5);
 
+            /*
+        double tempAccuracy[] = new double[1],
+               tempSensitivity[] = new double[1],
+                tempSpecificity[] = new double[1];
+        solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
+          */
         //solver.searchKernel(10);
         //solver.performCrossFoldValidation(5, tempAccuracy, tempSensitivity, tempSpecificity);
 

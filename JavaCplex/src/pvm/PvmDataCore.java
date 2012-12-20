@@ -5,6 +5,7 @@ import util.RandomUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 /**
  * Created with IntelliJ IDEA.
@@ -213,16 +214,10 @@ public class PvmDataCore {
     }
 
     protected void computeCurrentEntriesUnbiasedScore(){
-        int i, j;
-
         assert entries.size() == alphas.length;
 
-        for (i = 0; i < alphas.length; i++){
-            PvmEntry entry = entries.get(i);
-            entry.compareScore = 0.0;
-            for (j = 0; j < alphas.length; j++)
-                entry.compareScore += alphas[j] * gramMtx[i][j];
-        }
+        for (PvmEntry entry : entries)
+            entry.compareScore = getSignedDistance(entry);
     }
 
     protected int computeIndexSplitMaximizingAccuracy(PvmEntry tempEntries[]){
@@ -230,7 +225,6 @@ public class PvmDataCore {
         int falsePosCount, falseNegCount, bestFalseCount;
 
         Arrays.sort(tempEntries);
-
         falseNegCount = 0;
         falsePosCount = xNeg.length;
 
@@ -238,9 +232,9 @@ public class PvmDataCore {
 
         for (i = 0; i < tempEntries.length; i++){
             if (tempEntries[i].label)
-                falsePosCount++;
+                falseNegCount++;
             else
-                falseNegCount--;
+                falsePosCount--;
 
             if (bestFalseCount > falsePosCount + falseNegCount){
                 bestFalseCount = falsePosCount + falseNegCount;
@@ -252,8 +246,83 @@ public class PvmDataCore {
 
     }
 
-    public boolean recomputeHyperplaneBiasOptimizingAccuracy(double [] resT){
+    public boolean recomputeHyperplaneBiasOptimizingIQR(){
         PvmEntry tempEntries[] = new PvmEntry[entries.size()];
+
+        int i;
+        for (i = 0; i < tempEntries.length; i++)
+            tempEntries[i] = entries.get(i);
+
+        offsetB = 0.0;
+        computeCurrentEntriesUnbiasedScore();
+
+        Arrays.sort(tempEntries);
+
+        int locCount;
+        double medianNeg = 0, medianPos = 0, iqrNeg, iqrPos;
+        double lowQ = 0, uppQ = 0;
+
+        locCount = 0;
+
+        for (i = 0; i < tempEntries.length; i++){
+            if (tempEntries[i].label)
+                continue;
+
+            locCount++;
+
+            if (locCount == xNeg.length / 4)
+                lowQ = tempEntries[i].compareScore;
+            else if (locCount == xNeg.length / 2)
+                medianNeg = tempEntries[i].compareScore;
+            else if (locCount == (xNeg.length * 3) / 4){
+                uppQ = tempEntries[i].compareScore;
+                break;
+            }
+        }
+
+        iqrNeg = uppQ - lowQ;
+        if (iqrNeg < epsDouble)
+            iqrNeg = epsDouble;
+
+        locCount = 0;
+        for (i = 0; i < tempEntries.length; i++){
+            if (!tempEntries[i].label)
+                continue;
+
+            locCount++;
+
+            if (locCount == xPos.length / 4)
+                lowQ = tempEntries[i].compareScore;
+            else if (locCount == xPos.length / 2)
+                medianPos = tempEntries[i].compareScore;
+            else if (locCount == (xPos.length * 3) / 4){
+                uppQ = tempEntries[i].compareScore;
+                break;
+            }
+
+        }
+
+        iqrPos = uppQ - lowQ;
+        if (iqrPos < epsDouble)
+            iqrPos = epsDouble;
+
+
+        if (medianNeg > medianPos)
+            return false;
+
+        offsetB = -(iqrNeg * medianNeg + iqrPos * medianPos) / (iqrNeg + iqrPos);
+
+        return true;
+    }
+
+    public boolean recomputeHyperplaneBiasOptimizingAccuracy(){
+        PvmEntry tempEntries[] = new PvmEntry[entries.size()];
+
+        int i;
+        for (i = 0; i < tempEntries.length; i++)
+            tempEntries[i] = entries.get(i);
+
+        offsetB = 0.0;
         computeCurrentEntriesUnbiasedScore();
         int splitIdx = computeIndexSplitMaximizingAccuracy(tempEntries);
 
@@ -261,7 +330,7 @@ public class PvmDataCore {
             return false;
 
 
-        int i, locPosCount = 0, locNegCount = 0, tempCount;
+        int locPosCount = 0, locNegCount = 0, tempCount;
         double locMedpos = 0, locMedneg = 0, tempLowQ = 0, tempUppQ = 0;
         double iqrPos, iqrNeg;
 

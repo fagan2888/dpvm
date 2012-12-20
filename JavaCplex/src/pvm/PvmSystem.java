@@ -777,8 +777,10 @@ public class PvmSystem {
         for (i = 0; i < baseCount; i++)
             core.sigmas[i] = x[i + baseCount];
 
-        //core.recomputeHyperplaneBias(resT, positiveTrainBias);
-        core.recomputeHyperplaneBiasOptimizingAccuracy(resT);
+        core.recomputeHyperplaneBias(resT, positiveTrainBias);
+        //core.recomputeHyperplaneBiasOptimizingAccuracy();
+        //if (!core.recomputeHyperplaneBiasOptimizingIQR())
+          //  core.recomputeHyperplaneBias(resT, positiveTrainBias);
 
         return true;
     }
