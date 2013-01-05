@@ -17,6 +17,10 @@ public class KernelProductRbf extends KernelProduct{
     static double gammaInitialPowerRange = 14;
     static int gammaSearchMaxSteps = 29;
 
+    public KernelProductRbf(){
+        kerType = KernelProductManager.KerType.KERRBF;
+    }
+
     public double computeKerProd(double [] x0, double [] x1){
         double ret = 0, temp;
         int i, last_i = x0.length;

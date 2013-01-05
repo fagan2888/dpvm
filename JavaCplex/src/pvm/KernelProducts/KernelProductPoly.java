@@ -25,6 +25,8 @@ public class KernelProductPoly extends KernelProduct {
     double prodOffset;
     KernelProductScalar kerScalar;
 
+    public KernelProductPoly(){kerType = KernelProductManager.KerType.KERPOLY;}
+
     public double computeKerProd(double [] x0, double [] x1){
         double scalar = kerScalar.computeKerProd(x0, x1);
 

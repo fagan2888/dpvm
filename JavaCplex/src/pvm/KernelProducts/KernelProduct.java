@@ -12,7 +12,7 @@ import pvm.PvmEntry;
  */
 public abstract class KernelProduct {
 
-    KernelProductManager.KerType kerType;
+    protected KernelProductManager.KerType kerType;
     int refinementLvl = 1;
 
     public abstract double computeKerProd(double [] x0, double [] x1);

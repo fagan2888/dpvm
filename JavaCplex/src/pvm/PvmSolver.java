@@ -257,19 +257,19 @@ public class PvmSolver {
         for (KernelProductManager.KerType kerType : KernelProductManager.KerType.values())
         {
             //KernelProductManager.KerType kerType = KernelProductManager.KerType.KERRBF;
-            KernelProductManager.kerType = kerType;
-
+            KernelProductManager.setKernelTypeGlobal(kerType);
 
             last_i = KernelProductManager.getParamDMaxStepsCount();
 
             for (i = 0; i < last_i; i++){
                 tempParamD = KernelProductManager.getParamDValue(i, last_i);
-                KernelProductManager.paramD = tempParamD;
+                KernelProductManager.setParamDouble(tempParamD);
 
                 for (tempParamI = KernelProductManager.getMinParamI(); tempParamI <= KernelProductManager.getMaxParamI(); tempParamI++)
                 {
                     System.gc();
-                    KernelProductManager.paramI = tempParamI;
+
+                    KernelProductManager.setParamInt(tempParamI);
 
                     performCrossFoldValidation(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
 
@@ -284,9 +284,9 @@ public class PvmSolver {
             }
         }
 
-        KernelProductManager.kerType = bestKerType;
-        KernelProductManager.paramD = bestParamD;
-        KernelProductManager.paramI = bestParamI;
+        KernelProductManager.setKernelTypeGlobal(bestKerType);
+        KernelProductManager.setParamInt(bestParamI);
+        KernelProductManager.setParamDouble(bestParamD);
     }
 
     public void writeNormalizedDistancesToFiles(String fileNamePos, String fileNameNeg) throws IloException, IOException {
@@ -354,7 +354,7 @@ public class PvmSolver {
 
         solver.core.ReadFile(args[0]);
 
-        KernelProductManager.kerType = KernelProductManager.KerType.KERSCALAR;
+        KernelProductManager.setKernelTypeGlobal(KernelProductManager.KerType.KERSCALAR);
         solver.searchPositiveTrainBias(5);
 
             /*

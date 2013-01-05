@@ -11,128 +11,92 @@ import pvm.PvmEntry;
  */
 public class KernelProductManager {
 
+    public static KernelProductManager kernelProductManager;
+
     public enum KerType{
         KERSCALAR, KERPOLY, KERRBF
     }
 
-    public static KerType kerType = KerType.KERSCALAR;
-    public static double paramD = 1.0;
-    public static int paramI = 1;
-    protected static double kerScaling = 1.0;
+    KernelProduct kernels[];
+    KernelProduct activeKernel;
 
-    private static int minParamI = 1;
-    private static int maxParamI = 7;
-    private static int minParamDExponent = -20;
-    private static int maxParamDExponent = -1;
-    private static int maxParamDSteps = 20;
+    KerType kerType = KerType.KERSCALAR;
 
-    public static double ComputeKerProd(PvmEntry e0, PvmEntry e1)
-    {
-        switch (kerType)
-        {
-            case KERSCALAR: return kerScaling * ComputeKerProdScalar(e0, e1);
-            case KERPOLY: return kerScaling * ComputeKerProdPoly(e0, e1);
-            case KERRBF: return kerScaling * ComputeKerProdRbf(e0, e1);
+    public KernelProductManager(){
+        int i;
+        KerType kerTypes[] = KerType.values();
+        kernels = new KernelProduct[kerTypes.length];
 
-            default: return kerScaling * ComputeKerProdScalar(e0, e1);
+        for (i = 0; i < kernels.length; i++){
+            switch (kerTypes[i]){
+                case KERSCALAR: kernels[i] = new KernelProductScalar(); break;
+                case KERPOLY: kernels[i] = new KernelProductPoly(); break;
+                case KERRBF: kernels[i] = new KernelProductRbf(); break;
+
+                default: kernels[i] = new KernelProductScalar(); break;
+            }
         }
+
+        if (kernels.length > 0)
+            activeKernel = kernels[i];
+        else
+            activeKernel = null;
     }
 
-    public static void setKerScaling(double kerScaling1){
-        kerScaling = kerScaling1;
+    public static double ComputeKerProd(PvmEntry e0, PvmEntry e1){
+        return kernelProductManager.activeKernel.computeKerProd(e0, e1);
+    }
+
+    public static void setParamInt(int paramInt){
+        kernelProductManager.activeKernel.setParamInt(paramInt);
+    }
+
+    public static void setParamDouble(double paramDouble){
+        kernelProductManager.activeKernel.setParamDouble(paramDouble);
     }
 
     public static int getMinParamI(){
-
-        switch (kerType){
-            case KERSCALAR: return 0;
-            case KERRBF: return 0;
-            case KERPOLY: return minParamI;
-
-            default: return minParamI;
-        }
+        int centerInt = kernelProductManager.activeKernel.getPreferedCenterInt();
+        return kernelProductManager.activeKernel.getLowerBoundInt(centerInt);
     }
 
     public static int getMaxParamI(){
-        switch (kerType){
-            case KERSCALAR: return 0;
-            case KERRBF: return 0;
-            case KERPOLY: return maxParamI;
-
-            default: return maxParamI;
-        }
+        int centerInt = kernelProductManager.activeKernel.getPreferedCenterInt();
+        return kernelProductManager.activeKernel.getUpperBoundInt(centerInt);
     }
 
     public static double getMinParamD(){
-        switch (kerType)
-        {
-            case KERPOLY: return 0;
-            case KERRBF: return Math.exp(-20);
-
-            default : return 0;
-        }
+        double centerDouble = kernelProductManager.activeKernel.getPreferedCenterDouble();
+        return kernelProductManager.activeKernel.getLowerBoundDouble(centerDouble);
     }
 
     public static  double getMaxParamD(){
-        if (kerType == KerType.KERSCALAR)
-            return 0.0;
-
-        return 1.0;
+        double centerDouble = kernelProductManager.activeKernel.getPreferedCenterDouble();
+        return kernelProductManager.activeKernel.getUpperBoundDouble(centerDouble);
     }
 
     public static int getParamDMaxStepsCount(){
-
-        switch(kerType){
-            case KERSCALAR: return 1;
-            case KERPOLY: return 4;
-            case KERRBF: return maxParamDSteps;
-
-            default: return 1;
-        }
+        return kernelProductManager.activeKernel.getMaxStepsDouble();
     }
 
     public static double getParamDValue(int cStep, int maxSteps){
 
-        if (kerType == KerType.KERSCALAR)
-            return 0.0;
+        double boundLow, boundHigh;
 
-        assert(maxSteps > 1 && cStep >= 0 && cStep < maxSteps);
-        double r = (double)(cStep) / (double)(maxSteps - 1);
-
-        switch (kerType){
-            case KERPOLY: return r;
-            case KERRBF: return Math.exp(minParamDExponent + r * (maxParamDExponent - minParamDExponent));
-
-            default: return r;
-        }
+        boundLow = getMinParamD();
+        boundHigh = getMaxParamD();
+        return kernelProductManager.activeKernel.getParamValueDouble(boundLow, boundHigh, maxSteps, cStep);
     }
 
-    public static double ComputeKerProdScalar(PvmEntry e0, PvmEntry e1){
-        int i;
-        double res = 0;
-
-        assert(e0.x.length == e1.x.length);
-        for (i = 0; i < e0.x.length; i++)
-            res += e0.x[i] * e1.x[i];
-
-        return res;
+    public static void setKernelTypeGlobal(KerType kerType){
+        kernelProductManager.setKernelType(kerType);
     }
 
-    public static double ComputeKerProdPoly(PvmEntry e0, PvmEntry e1){
-        return Math.pow((ComputeKerProdScalar(e0, e1) + paramD), paramI);
-    }
-
-    public static double ComputeKerProdRbf(PvmEntry e0, PvmEntry e1){
-        int i;
-        double res = 0, temp;
-
-        assert(e0.x.length == e1.x.length);
-        for (i = 0; i < e0.x.length; i++)
-        {
-            temp = e0.x[i] - e1.x[i];
-            res += temp * temp;
-        }
-
-        return Math.exp(- paramD * res);
+    public void setKernelType(KerType kerType){
+        for (KernelProduct kernel : kernels)
+            if (kernel.kerType == kerType){
+                activeKernel = kernel;
+                break;
+            }
     }
 }
