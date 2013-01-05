@@ -1,11 +1,11 @@
 package pvm;
 
+import pvm.KernelProducts.KernelProductManager;
 import util.RandomUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 
 /**
  * Created with IntelliJ IDEA.
@@ -105,7 +105,7 @@ public class PvmDataCore {
             for (j = i; j < entries.size(); j++)
             {
                 //gramMtx[i][j] = ComputeKerProd(i, j);
-                gramMtx[i][j] = KerProduct.ComputeKerProd(entries.get(i), entries.get(j));
+                gramMtx[i][j] = KernelProductManager.ComputeKerProd(entries.get(i), entries.get(j));
                 gramMtx[j][i] = gramMtx[i][j];
             }
 
@@ -548,7 +548,7 @@ public class PvmDataCore {
             if (alphas[i] == 0)
                 continue;
 
-            sum += alphas[i] * KerProduct.ComputeKerProd(src, entries.get(i));
+            sum += alphas[i] * KernelProductManager.ComputeKerProd(src, entries.get(i));
         }
 
         return sum;

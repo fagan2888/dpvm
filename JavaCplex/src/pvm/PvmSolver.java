@@ -2,7 +2,7 @@ package pvm;
 
 import dsolve.LocalSolver;
 import ilog.concert.IloException;
-import sun.awt.geom.Crossings;
+import pvm.KernelProducts.KernelProductManager;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -240,7 +240,7 @@ public class PvmSolver {
     public void searchKernel(int splitCount) throws IloException {
 
         int i, last_i;
-        KerProduct.KerType bestKerType = KerProduct.KerType.KERSCALAR;
+        KernelProductManager.KerType bestKerType = KernelProductManager.KerType.KERSCALAR;
         double bestParamD = 0.0;
         int bestParamI = 0;
 
@@ -254,22 +254,22 @@ public class PvmSolver {
         double tempSpecificity[] = new double[1];
 
 
-        //for (KerProduct.KerType kerType : KerProduct.KerType.values())
+        for (KernelProductManager.KerType kerType : KernelProductManager.KerType.values())
         {
-            KerProduct.KerType kerType = KerProduct.KerType.KERRBF;
-            KerProduct.kerType = kerType;
+            //KernelProductManager.KerType kerType = KernelProductManager.KerType.KERRBF;
+            KernelProductManager.kerType = kerType;
 
 
-            last_i = KerProduct.getParamDMaxStepsCount();
+            last_i = KernelProductManager.getParamDMaxStepsCount();
 
             for (i = 0; i < last_i; i++){
-                tempParamD = KerProduct.getParamDValue(i , last_i);
-                KerProduct.paramD = tempParamD;
+                tempParamD = KernelProductManager.getParamDValue(i, last_i);
+                KernelProductManager.paramD = tempParamD;
 
-                for (tempParamI = KerProduct.getMinParamI(); tempParamI <= KerProduct.getMaxParamI(); tempParamI++)
+                for (tempParamI = KernelProductManager.getMinParamI(); tempParamI <= KernelProductManager.getMaxParamI(); tempParamI++)
                 {
                     System.gc();
-                    KerProduct.paramI = tempParamI;
+                    KernelProductManager.paramI = tempParamI;
 
                     performCrossFoldValidation(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
 
@@ -284,9 +284,9 @@ public class PvmSolver {
             }
         }
 
-        KerProduct.kerType = bestKerType;
-        KerProduct.paramD = bestParamD;
-        KerProduct.paramI = bestParamI;
+        KernelProductManager.kerType = bestKerType;
+        KernelProductManager.paramD = bestParamD;
+        KernelProductManager.paramI = bestParamI;
     }
 
     public void writeNormalizedDistancesToFiles(String fileNamePos, String fileNameNeg) throws IloException, IOException {
@@ -354,7 +354,7 @@ public class PvmSolver {
 
         solver.core.ReadFile(args[0]);
 
-        KerProduct.kerType = KerProduct.KerType.KERSCALAR;
+        KernelProductManager.kerType = KernelProductManager.KerType.KERSCALAR;
         solver.searchPositiveTrainBias(5);
 
             /*
