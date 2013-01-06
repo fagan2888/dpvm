@@ -19,13 +19,16 @@ public class KernelProductPoly extends KernelProduct {
 
     static double productOffsetInitialCenter = 0.5;
     static double productOffsetInitialRange = 0.5;
-    static int productOffsetMaxSteps = 10;
+    static int productOffsetMaxSteps = 2;
 
     int iPow;
     double prodOffset;
     KernelProductScalar kerScalar;
 
-    public KernelProductPoly(){kerType = KernelProductManager.KerType.KERPOLY;}
+    public KernelProductPoly(){
+        kerType = KernelProductManager.KerType.KERPOLY;
+        kerScalar = new KernelProductScalar();
+    }
 
     public double computeKerProd(double [] x0, double [] x1){
         double scalar = kerScalar.computeKerProd(x0, x1);
@@ -53,10 +56,20 @@ public class KernelProductPoly extends KernelProduct {
     }
 
     public double getLowerBoundDouble(double centerParamDouble){
-        return centerParamDouble - productOffsetInitialRange / refinementLvl;
+        double ret = centerParamDouble - productOffsetInitialRange / refinementLvl;
+        if (ret < 0)
+            ret = 0;
+        if (ret > 1)
+            ret = 1;
+        return ret;
     }
     public double getUpperBoundDouble(double centerParamDouble){
-        return centerParamDouble + productOffsetInitialRange / refinementLvl;
+        double ret = centerParamDouble + productOffsetInitialRange / refinementLvl;
+        if (ret < 0)
+            ret = 0;
+        if (ret > 1)
+            ret = 1;
+        return ret;
     }
 
     public int getMaxStepsInt(){

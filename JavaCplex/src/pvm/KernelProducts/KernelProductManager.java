@@ -11,7 +11,7 @@ import pvm.PvmEntry;
  */
 public class KernelProductManager {
 
-    public static KernelProductManager kernelProductManager;
+    public static KernelProductManager kernelProductManager = new KernelProductManager();
 
     public enum KerType{
         KERSCALAR, KERPOLY, KERRBF
@@ -38,7 +38,7 @@ public class KernelProductManager {
         }
 
         if (kernels.length > 0)
-            activeKernel = kernels[i];
+            activeKernel = kernels[0];
         else
             activeKernel = null;
     }
@@ -55,28 +55,69 @@ public class KernelProductManager {
         kernelProductManager.activeKernel.setParamDouble(paramDouble);
     }
 
+    public static int getPreferedCenterInt(){
+        return kernelProductManager.activeKernel.getPreferedCenterInt();
+    }
+
+    public static double getPreferedCenterDouble(){
+        return kernelProductManager.activeKernel.getPreferedCenterDouble();
+    }
+
     public static int getMinParamI(){
         int centerInt = kernelProductManager.activeKernel.getPreferedCenterInt();
+        return getMinParamI(centerInt);
+    }
+
+    public static int getMinParamI(int centerInt){
         return kernelProductManager.activeKernel.getLowerBoundInt(centerInt);
     }
 
     public static int getMaxParamI(){
         int centerInt = kernelProductManager.activeKernel.getPreferedCenterInt();
+        return getMaxParamI(centerInt);
+    }
+
+    public static int getMaxParamI(int centerInt){
         return kernelProductManager.activeKernel.getUpperBoundInt(centerInt);
     }
 
+    public static int getParamIntMaxStepsCount(){
+        return kernelProductManager.activeKernel.getMaxStepsInt();
+    }
+
+
     public static double getMinParamD(){
         double centerDouble = kernelProductManager.activeKernel.getPreferedCenterDouble();
+        return getMinParamD(centerDouble);
+    }
+
+    public static double getMinParamD(double centerDouble){
         return kernelProductManager.activeKernel.getLowerBoundDouble(centerDouble);
     }
 
     public static  double getMaxParamD(){
         double centerDouble = kernelProductManager.activeKernel.getPreferedCenterDouble();
+        return getMaxParamD(centerDouble);
+    }
+
+    public static  double getMaxParamD(double centerDouble){
         return kernelProductManager.activeKernel.getUpperBoundDouble(centerDouble);
     }
 
-    public static int getParamDMaxStepsCount(){
+    public static int getParamDoubleMaxStepsCount(){
         return kernelProductManager.activeKernel.getMaxStepsDouble();
+    }
+
+    public static double getParamDValue(double boundLow, double boundHigh, int cStep, int maxSteps){
+        return kernelProductManager.activeKernel.getParamValueDouble(boundLow, boundHigh, maxSteps, cStep);
+    }
+
+    public static int getParamIValue(int boundLow, int boundHigh, int cStep, int maxSteps){
+        return kernelProductManager.activeKernel.getParamValueInt(boundLow, boundHigh, maxSteps, cStep);
+    }
+
+    public static void setRefinementLevel(int refinementLevel){
+        kernelProductManager.activeKernel.setRefinementLevel(refinementLevel);
     }
 
     public static double getParamDValue(int cStep, int maxSteps){
