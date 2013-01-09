@@ -191,7 +191,8 @@ public class PvmSolver {
         int i, solvesCount = 0;
         core.Init(false);
 
-
+        //todo: Mihai should inject the parallelization code here
+        //the localSlv
         ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices(splitCount);
         ArrayList<PvmDataCore> tempCores = new ArrayList<PvmDataCore>(splitCores.size());
         PvmDataCore cTestCore;
