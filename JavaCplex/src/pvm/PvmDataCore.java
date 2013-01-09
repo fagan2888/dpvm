@@ -51,7 +51,10 @@ public class PvmDataCore {
         offsetB = 0;
 
         SortNegativeAndPositiveEntries();
-        ComputeGramMatrix();
+
+	    if ( computeGramMtx ) {
+            ComputeGramMatrix();
+	    }
     }
 
     public void SortNegativeAndPositiveEntries(){

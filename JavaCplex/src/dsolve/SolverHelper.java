@@ -200,21 +200,25 @@ public class SolverHelper {
 	}
 
 	public static void listJarFiles( String dirPath ) throws URISyntaxException, IOException {
-		logger.info( "Listing resources like: " + dirPath );
+		logInfoMsg( "Listing resources like: " + dirPath );
 		URL url = ClassLoader.getSystemResource( dirPath );
 		if ( url != null ) {
-			logger.info( "file: " + url.toURI() );
+			logInfoMsg( "file: " + url.toURI() );
 		}
 
 		String classPath = System.getProperty( "java.library.path" );
 		for ( String pathDir : classPath.split( ":" ) ) {
-			logger.info( "pathDir: " + pathDir );
+			logInfoMsg( "pathDir: " + pathDir );
 		}
+	}
+
+	private static void logInfoMsg( String msg ) {
+		logger.info( msg );
 	}
 
 	public static void dropNativeCplex( String pathFolder ) throws IOException, URISyntaxException {
 
-		logger.info( "adding dir to java path: " + pathFolder );
+		logInfoMsg( "adding dir to java path: " + pathFolder );
 		addDir2JavaPath( pathFolder );
 
 		// generate temporary directory as library path
@@ -228,18 +232,18 @@ public class SolverHelper {
 		URL url = ClassLoader.getSystemResource( libName );
 		InputStream inputStream = null;
 		if ( url != null ) {
-			logger.info( "found in jar as: " + url.toURI() );
+			logInfoMsg( "found in jar as: " + url.toURI() );
 			JarURLConnection conn = ( JarURLConnection ) url.openConnection();
 			inputStream = conn.getInputStream();
 		}
 
 		if ( inputStream == null ) {
-			logger.info( "cplex native library not in this jar; trying to load from disk" );
+			logInfoMsg( "cplex native library not in this jar; trying to load from disk" );
 			File libFile = new File( pathFolder+ File.separator + libName );
 			if ( !libFile.exists() ) {
 				logger.error(
-						"cplex native library does not exists at location: " + libFile.getAbsolutePath(),
-						new FileNotFoundException( libFile.getAbsolutePath() )
+					"cplex native library does not exists at location: " + libFile.getAbsolutePath(),
+					new FileNotFoundException( libFile.getAbsolutePath() )
 				);
 				return;
 			}
@@ -256,13 +260,13 @@ public class SolverHelper {
 		String finalLibPath = libraryPath + File.separator + libName;
 		OutputStream outputStream = new FileOutputStream( finalLibPath );
 		copyStream( inputStream, outputStream );
-		logger.info( "library: " + finalLibPath + " dropped to disk" );
+		logInfoMsg( "library: " + finalLibPath + " dropped to disk" );
 
 		// close file streams
 		outputStream.close();
 
 		addDir2JavaPath( libraryPath.getAbsolutePath() );
-		logger.info( String.format( "library: %s added to java library path env", libraryPath ) );
+		logInfoMsg( String.format( "library: %s added to java library path env", libraryPath ) );
 	}
 
 	public static void dropNativeCplex() throws IOException, URISyntaxException {

@@ -40,7 +40,7 @@ public class PvmSystem {
     public boolean BuildSystemFor(PvmDataCore pvms, double t, boolean saveSys, boolean nameAllConstraints){
 
         try {
-            addCplexSolver(false);
+            addCplexSolver( false );
         }
         catch (IloException e){
             return false;
@@ -710,7 +710,7 @@ public class PvmSystem {
 
     public boolean buildSingleLPSystemWithBias(PvmDataCore pvms, double positiveBias) throws IloException {
         cleanCplex();
-        addCplexSolver(false);
+        addCplexSolver( false );
 
         core = pvms;
         baseCount = core.entries.size();
@@ -731,7 +731,7 @@ public class PvmSystem {
 
     public boolean buildSingleLPSystem(PvmDataCore pvms, boolean saveSys, boolean nameAllVars, boolean nameAllConstraints) throws IloException {
 
-        addCplexSolver(false);
+        addCplexSolver( false );
 
         core = pvms;
         baseCount = core.entries.size();
@@ -864,7 +864,7 @@ public class PvmSystem {
 
     public boolean buildSecondaryLpSystem (PvmDataCore pvms) throws IloException {
 
-        addCplexSolver(false);
+        addCplexSolver( false );
 
         core = pvms;
         baseCount = core.entries.size();
@@ -900,19 +900,21 @@ public class PvmSystem {
     }
 
     @Override
-    protected void finalize() throws IloException {
+    protected void finalize() throws Throwable {
         cleanCplex();
+	    super.finalize();
     }
 
-    private void addCplexSolver(boolean verbalize) throws IloException {
+    private void addCplexSolver( boolean verbalize ) throws IloException {
         cleanCplex();
         cplex = new IloCplex();
 
-        if (!verbalize) { cplex.setOut(null); }
+        if ( !verbalize ) { cplex.setOut(null); }
 
 	    cplex.setParam( IloCplex.BooleanParam.NumericalEmphasis, true );
 	    cplex.setParam( IloCplex.IntParam.Threads, 4 );
+	    //cplex.setParam( IloCplex.IntParam.ParallelMode, IloCplex.ParallelMode.Deterministic );
 
-	    cplex.setParam( IloCplex.IntParam.RootAlg, IloCplex.Algorithm.Dual );
+	    //cplex.setParam( IloCplex.IntParam.RootAlg, IloCplex.Algorithm.Dual );
     }
 }

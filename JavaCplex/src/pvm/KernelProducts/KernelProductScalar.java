@@ -5,7 +5,6 @@ package pvm.KernelProducts;
  * User: Andrei
  * Date: 1/4/13
  * Time: 7:03 PM
- * To change this template use File | Settings | File Templates.
  */
 public class KernelProductScalar extends KernelProduct{
 

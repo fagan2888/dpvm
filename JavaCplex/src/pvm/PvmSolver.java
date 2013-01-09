@@ -1,6 +1,7 @@
 package pvm;
 
 import dsolve.LocalSolver;
+import dsolve.SolverHelper;
 import ilog.concert.IloException;
 import org.apache.commons.lang3.mutable.MutableDouble;
 import pvm.KernelProducts.KernelProductManager;
@@ -8,8 +9,10 @@ import pvm.KernelProducts.KernelProductManager;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.concurrent.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -24,7 +27,7 @@ public class PvmSolver {
     public static int maximumPositiveTrainBias = 5;
 
     public PvmSolver(){
-        core = new PvmDataCore();
+	    core = new PvmDataCore();
         pvmSys = new PvmSystem();
     }
     public boolean Train(){
@@ -123,8 +126,9 @@ public class PvmSolver {
         double [] resT = new double[1];
 
         core.Init();
-        pvmSys.buildSingleLPSystemWithBias(core, positiveBias);
-        ret = pvmSys.solveSingleLPWithBias(resT, positiveBias);
+        pvmSys.buildSingleLPSystemWithBias( core, positiveBias );
+
+        ret = pvmSys.solveSingleLPWithBias( resT, positiveBias );
 
         if (ret && resT[0] == 0.0)
         {
@@ -152,7 +156,7 @@ public class PvmSolver {
         return retLabels;
     }
 
-    public static void computeAccuracy(boolean labels[], ArrayList<PvmEntry> entries, double [] accuracy, double [] sensitivity, double [] specificity){
+    public static void computeAccuracy( boolean labels[], ArrayList<PvmEntry> entries, double [] accuracy, double [] sensitivity, double [] specificity, int split ){
         int i;
         int tp = 0, tn = 0, fp = 0, fn = 0;
 
@@ -179,58 +183,67 @@ public class PvmSolver {
         assert (specificity.length > 0 && sensitivity.length > 0 && accuracy.length > 0);
 
         if (fn + tp > 0)
-            sensitivity[0] = (double)tp / (double)(fn + tp);
+            sensitivity[split] = (double)tp / (double)(fn + tp);
 
         if (fp + tn > 0)
-            specificity[0] = (double)tn / (double)(fp + tn);
+            specificity[split] = (double)tn / (double)(fp + tn);
 
-        accuracy[0] = (double)(tp + tn) / (double)(entries.size());
+        accuracy[split] = (double)(tp + tn) / (double)(entries.size());
     }
 
     public void performCrossFoldValidationWithBias(int splitCount, double positiveBias, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
-        int i, solvesCount = 0;
+        int i, solvesCount;
         core.Init(false);
 
-        //todo: Mihai should inject the parallelization code here
-        //the localSlv
-        ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices(splitCount);
-        ArrayList<PvmDataCore> tempCores = new ArrayList<PvmDataCore>(splitCores.size());
-        PvmDataCore cTestCore;
-        PvmSolver localSlv = new PvmSolver();
-        double tempAccuracy[] = new double[1];
-        double tempSensitivity[] = new double[1];
-        double tempSpecificity[] = new double[1];
+        ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices( splitCount );
 
+        double foldAccuracy[]       = new double[splitCount];
+        double foldSensitivity[]    = new double[splitCount];
+        double foldSpecificity[]    = new double[splitCount];
+	    boolean foldSolvedFlags[]   = new boolean[splitCount];
 
-        assert (splitCount == splitCores.size());
-        assert(accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0);
+        assert( splitCount == splitCores.size() );
+        assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
-        accuracy[0] = sensitivity[0] = specificity[0] = 0.0;
+	    //splitCount = 1;
+	    ExecutorService executorService = Executors.newFixedThreadPool( 2 );
 
-        for (i = 0; i < splitCount; i++){
-            tempCores.clear();
-            tempCores.addAll(splitCores);
+	    // spawn a thread pool and add each fold as a task
+        for ( i = 0; i<splitCount; i++ ) {
 
-            cTestCore = tempCores.get(i);
+	        foldAccuracy[i]    = 0.0;
+	        foldSensitivity[i] = 0.0;
+	        foldSpecificity[i] = 0.0;
+	        foldSolvedFlags[i] = false;
 
-            tempCores.remove(i);
-            localSlv.core = PvmDataCore.mergeCores(tempCores);
+	        SolverFoldRunnable foldRunnable = new SolverFoldRunnable( splitCores, i, positiveBias );
+	        foldRunnable.setResultVectors( foldAccuracy, foldSensitivity, foldSpecificity, foldSolvedFlags );
 
-            if (!localSlv.TrainSingleLPWithBias(positiveBias))
-                continue;
-
-            solvesCount++;
-
-            boolean localLabels[] = localSlv.classify(cTestCore.entries);
-            PvmSolver.computeAccuracy(localLabels, cTestCore.entries, tempAccuracy, tempSensitivity, tempSpecificity);
-
-            accuracy[0] += tempAccuracy[0];
-            sensitivity[0] += tempSensitivity[0];
-            specificity[0] += tempSpecificity[0];
+	        executorService.submit( foldRunnable );
         }
 
-        if (solvesCount > 0){
-            accuracy[0] /= (double)solvesCount;
+	    try {
+		    synchronized ( executorService ) {
+			    executorService.shutdown();
+		        executorService.awaitTermination( 24, TimeUnit.HOURS );
+		    }
+	    } catch ( InterruptedException e ) {
+		    e.printStackTrace();
+	    }
+
+	    solvesCount = 0;
+	    for ( i=0; i<splitCount; i++ ) {
+
+		    if ( foldSolvedFlags[i] ) {
+			    solvesCount++;
+		    }
+		    accuracy[0]    += foldAccuracy[i];
+		    sensitivity[0] += foldSensitivity[i];
+		    specificity[0] += foldSpecificity[i];
+	    }
+
+	    if ( solvesCount > 0 ) {
+            accuracy[0]    /= (double)solvesCount;
             sensitivity[0] /= (double)solvesCount;
             specificity[0] /= (double)solvesCount;
         }
@@ -272,7 +285,7 @@ public class PvmSolver {
                 {
                     System.gc();
 
-                    KernelProductManager.setParamInt(tempParamI);
+                    KernelProductManager.setParamInt( tempParamI );
 
                     performCrossFoldValidation(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
 
@@ -429,16 +442,74 @@ public class PvmSolver {
         KernelProductManager.setParamDouble(trainParameters.paramDouble);
     }
 
-    public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException, CloneNotSupportedException {
+	private static class SolverFoldRunnable implements Runnable {
 
-        if (args.length < 1)
-            return;
+		ArrayList<PvmDataCore> splitCores;
 
-        PvmSolver solver = new PvmSolver();
+		ArrayList<PvmDataCore> trainCores;
+		PvmDataCore testCore;
+
+		double accuracy[];
+		double sensitivity[];
+		double specificity[];
+		boolean solvedFlags[];
+
+		double positiveBias = 0;
+		int    split = -1;
+
+		public SolverFoldRunnable( ArrayList<PvmDataCore> splitCores, int split, double positiveBias ) throws IloException {
+
+			this.splitCores = splitCores;
+			this.positiveBias = positiveBias;
+			this.split = split;
+		}
+
+		public void setResultVectors( double accuracy[], double sensitivity[], double specificity[], boolean solvedFlags[] ) {
+			this.accuracy    = accuracy;
+			this.sensitivity = sensitivity;
+			this.specificity = specificity;
+			this.solvedFlags = solvedFlags;
+		}
+
+		@Override
+		public void run() {
+
+			// add data to local storage ( just pointers, no data )
+			trainCores = new ArrayList<PvmDataCore>( splitCores.size() );
+			trainCores.addAll( splitCores );
+
+			testCore = trainCores.get( split );
+			trainCores.remove( split );
+
+			PvmSolver localSlv = new PvmSolver();
+			localSlv.core = PvmDataCore.mergeCores( trainCores );
+
+			try {
+				solvedFlags[split] = true;
+				if ( !localSlv.TrainSingleLPWithBias( positiveBias ) ) {
+					solvedFlags[split] = false;
+					return;
+				}
+				boolean localLabels[] = localSlv.classify( testCore.entries );
+				PvmSolver.computeAccuracy( localLabels, testCore.entries, accuracy, sensitivity, specificity, split );
+
+			} catch ( IloException e ) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException, CloneNotSupportedException {
+
+        if (args.length < 1) return;
+
+	    try { SolverHelper.dropNativeCplex(); } catch ( URISyntaxException ignored ) {}
+
+	    PvmSolver solver = new PvmSolver();
         PvmTrainParameters bestTrainParams = new PvmTrainParameters();
         MutableDouble acc = new MutableDouble(0), sens = new MutableDouble(0), spec = new MutableDouble(0);
 
-        solver.core.ReadFile(args[0]);
-        solver.searchTrainParameters(5, 5, bestTrainParams, acc, sens, spec);
+        solver.core.ReadFile( args[0] );
+        solver.searchTrainParameters( 5, 5, bestTrainParams, acc, sens, spec );
     }
 }
