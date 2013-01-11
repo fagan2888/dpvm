@@ -23,6 +23,7 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
 
     @Override
     protected Object clone() throws CloneNotSupportedException {
+	    super.clone();
         PvmTrainParameters ret = new PvmTrainParameters();
 
         ret.kerType = kerType;
@@ -36,6 +37,17 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
 
         return ret;
     }
+
+	public void copyFrom( PvmTrainParameters other ) {
+		this.kerType = other.kerType;
+		this.paramInt = other.paramInt;
+		this.paramDouble = other.paramDouble;
+		this.trainBias = other.trainBias;
+
+		this.accuracy = other.accuracy;
+		this.sensitivity = other.sensitivity;
+		this.specificity = other.specificity;
+	}
 
     @Override
     public boolean equals(Object other){
@@ -61,4 +73,16 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
 
         return 0;
     }
+
+	@Override
+	public String toString() {
+		return "KTYPE:" + kerType.name() + "/PINT:" + paramInt + "/PDBL:" + paramDouble + "/BIAS:" + trainBias;
+	}
+
+	public String toCompleteString() {
+		return toString()+ String.format(
+			"/ACC:%.03f/SENS:%.03f/SPEC:%.03f",
+			accuracy, sensitivity, specificity
+		);
+	}
 }

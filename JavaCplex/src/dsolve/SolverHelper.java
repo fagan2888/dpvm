@@ -213,7 +213,7 @@ public class SolverHelper {
 	}
 
 	private static void logInfoMsg( String msg ) {
-		logger.info( msg );
+		//logger.info( msg );
 	}
 
 	public static void dropNativeCplex( String pathFolder ) throws IOException, URISyntaxException {

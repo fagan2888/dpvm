@@ -12,7 +12,9 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created with IntelliJ IDEA.
@@ -206,7 +208,7 @@ public class PvmSolver {
         assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
 	    //splitCount = 1;
-	    ExecutorService executorService = Executors.newFixedThreadPool( 2 );
+	    ExecutorService executorService = Executors.newFixedThreadPool( 4 );
 
 	    // spawn a thread pool and add each fold as a task
         for ( i = 0; i<splitCount; i++ ) {
@@ -236,10 +238,10 @@ public class PvmSolver {
 
 		    if ( foldSolvedFlags[i] ) {
 			    solvesCount++;
+			    accuracy[0]    += foldAccuracy[i];
+			    sensitivity[0] += foldSensitivity[i];
+			    specificity[0] += foldSpecificity[i];
 		    }
-		    accuracy[0]    += foldAccuracy[i];
-		    sensitivity[0] += foldSensitivity[i];
-		    specificity[0] += foldSpecificity[i];
 	    }
 
 	    if ( solvesCount > 0 ) {
@@ -332,29 +334,20 @@ public class PvmSolver {
         int i;
         double cPow, maxCPow, bestTrainBias = 1.0, tempTrainBias;
         double bestAcc = 0.0;
-        double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
-
 
         for (i = -maximumPositiveTrainBias; i <= maximumPositiveTrainBias; i++){
-            tempTrainBias = Math.pow(2, (double)i);
 
-            performCrossFoldValidationWithBias(splitCount, tempTrainBias, tempAcc, tempSens, tempSpec);
+	        double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
+	        tempTrainBias = Math.pow(2, (double)i);
 
-            if (bestAcc < tempAcc[0]){
-                bestAcc = tempAcc[0];
-                bestTrainBias = tempTrainBias;
-
-                accuracy.setValue(tempAcc[0]);
-                sensitivity.setValue(tempSens[0]);
-                specificity.setValue(tempSpec[0]);
-            }
-        }
-                       /* todo: remove these comments on the commit version
-        maxCPow = bestTrainBias + 1.0;
-        for (cPow = bestTrainBias - 1.0; cPow <= maxCPow; cPow += 0.2){
-            tempTrainBias = Math.pow(2, cPow);
-
-            performCrossFoldValidationWithBias(splitCount, tempTrainBias, tempAcc, tempSens, tempSpec);
+	        System.out.print( String.format( "\t\tBIASPOW:2^%2d", i ) ); long start = System.currentTimeMillis();
+	        performCrossFoldValidationWithBias( splitCount, tempTrainBias, tempAcc, tempSens, tempSpec );
+	        System.out.println(
+			    String.format(
+			        "/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d",
+				    tempAcc[0],tempSens[0],tempSpec[0], (System.currentTimeMillis()-start)/1000
+			    )
+	        );
 
             if (bestAcc < tempAcc[0]){
                 bestAcc = tempAcc[0];
@@ -365,17 +358,22 @@ public class PvmSolver {
                 specificity.setValue(tempSpec[0]);
             }
         }
-                */
+
         return bestTrainBias;
     }
 
-    private void addLocalTrainParameters(int splitCount, int refinementLvl, PvmTrainParameters tempParams, ArrayList<PvmTrainParameters> bestTrainParams) throws IloException, CloneNotSupportedException {
+    private void addLocalTrainParameters(
+		    int splitCount,
+		    int refinementLvl,
+		    PvmTrainParameters tempParams,
+		    ArrayList<PvmTrainParameters> bestTrainParams)
+		    throws IloException, CloneNotSupportedException {
+
         MutableDouble tempAccuracy = new MutableDouble(0), tempSensitivity = new MutableDouble(0), tempSpecificity = new MutableDouble(0);
         double boundDLow, boundDHigh;
         int boundILow, boundIHigh;
         int paramIntItMax, paramDoubleItMax;
         int itParamInt, itParamDouble;
-
 
         KernelProductManager.setKernelTypeGlobal(tempParams.kerType);
         KernelProductManager.setRefinementLevel(refinementLvl);
@@ -393,10 +391,21 @@ public class PvmSolver {
             KernelProductManager.setParamInt(tempParams.paramInt);
 
             for (itParamDouble = 0; itParamDouble < paramDoubleItMax; itParamDouble++){
+
                 tempParams.paramDouble = KernelProductManager.getParamDValue(boundDLow, boundDHigh, itParamDouble, paramDoubleItMax);
                 KernelProductManager.setParamDouble(tempParams.paramDouble);
 
+	            System.out.println( "\tEVALUATING->" + tempParams );
+	            long start = System.currentTimeMillis();
+
+	            // do the actual search
                 tempParams.trainBias = searchPositiveTrainBias(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
+
+	            System.out.printf(
+		            "\tEVALUATED ->%s/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d\n",
+		            tempParams,tempAccuracy.doubleValue(),tempSensitivity.doubleValue(),tempSpecificity.doubleValue(),(System.currentTimeMillis()-start)/1000
+	            );
+
                 tempParams.accuracy = tempAccuracy.doubleValue();
                 tempParams.sensitivity = tempSensitivity.doubleValue();
                 tempParams.specificity = tempSpecificity.doubleValue();
@@ -417,27 +426,47 @@ public class PvmSolver {
             tempParams.paramInt = KernelProductManager.getPreferedCenterInt();
             tempParams.paramDouble = KernelProductManager.getPreferedCenterDouble();
 
-            addLocalTrainParameters(splitCount, refinementLvl, tempParams, bestTrainParams);
+	        System.out.println( "EVALKERNEL: " + tempParams.kerType );
+	        long start = System.currentTimeMillis();
+
+	        addLocalTrainParameters(splitCount, refinementLvl, tempParams, bestTrainParams);
+
+	        System.out.println( "EVALKERNEL: " + tempParams.kerType + "/TIME:" + String.valueOf( (System.currentTimeMillis()-start)/1000 ) );
         }
 
         Collections.sort(bestTrainParams, tempParams);
         while (bestTrainParams.size() > maxBestPositions)
             bestTrainParams.remove(bestTrainParams.size() - 1);
 
+	    System.out.println( "Found best train params: " );
+	    for ( PvmTrainParameters params : bestTrainParams ) {
+		    System.out.println( "\t" + params.toCompleteString() );
+	    }
+	    System.out.println( "making refinements now...." );
 
         for (refinementLvl = 2; refinementLvl < 4; refinementLvl++){
-            for (int i = bestTrainParams.size() - 1; i > 0; i--)
+            for (int i = bestTrainParams.size() - 1; i > 0; i--) {
+	            System.out.print( "EVAL/" + tempParams );
+	            long start = System.currentTimeMillis();
                 addLocalTrainParameters(splitCount, refinementLvl, bestTrainParams.get(i), bestTrainParams);
+	            System.out.println( "/TIME:" + (System.currentTimeMillis()-start)*1000 );
+            }
 
             Collections.sort(bestTrainParams, tempParams);
             while (bestTrainParams.size() > maxBestPositions)
                 bestTrainParams.remove(bestTrainParams.size() - 1);
         }
 
-        trainParameters = (PvmTrainParameters)bestTrainParams.get(0).clone();
+	    System.out.println( "Found final best train params: " );
+	    for ( PvmTrainParameters params : bestTrainParams ) {
+		    System.out.println( "\t" + params.toCompleteString() );
+	    }
+
+	    // copy the values rather than assign a new value to the original pointer
+        trainParameters.copyFrom( bestTrainParams.get( 0 ) );
 
         KernelProductManager.setKernelTypeGlobal(trainParameters.kerType);
-        KernelProductManager.setRefinementLevel(1);
+        KernelProductManager.setRefinementLevel( 1 );
         KernelProductManager.setParamInt(trainParameters.paramInt);
         KernelProductManager.setParamDouble(trainParameters.paramDouble);
     }
