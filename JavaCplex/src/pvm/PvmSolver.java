@@ -27,6 +27,7 @@ public class PvmSolver {
     public PvmDataCore core;
     public PvmSystem pvmSys;
     public static int maximumPositiveTrainBias = 5;
+    public int maxBestPositions = 5;
 
     public PvmSolver(){
 	    core = new PvmDataCore();
@@ -332,7 +333,7 @@ public class PvmSolver {
 
     public double searchPositiveTrainBias(int splitCount, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity) throws IloException {
         int i;
-        double cPow, maxCPow, bestTrainBias = 1.0, tempTrainBias;
+        double cPow, maxCPow = 0, bestTrainBias = 1.0, tempTrainBias;
         double bestAcc = 0.0;
 
         for (i = -maximumPositiveTrainBias; i <= maximumPositiveTrainBias; i++){
@@ -348,6 +349,32 @@ public class PvmSolver {
 				    tempAcc[0],tempSens[0],tempSpec[0], (System.currentTimeMillis()-start)/1000
 			    )
 	        );
+
+            if (bestAcc < tempAcc[0]){
+                bestAcc = tempAcc[0];
+                bestTrainBias = tempTrainBias;
+                maxCPow = i;
+
+                accuracy.setValue(tempAcc[0]);
+                sensitivity.setValue(tempSens[0]);
+                specificity.setValue(tempSpec[0]);
+            }
+        }
+
+
+        maxCPow += 1;
+        for (cPow = maxCPow - 2; cPow < maxCPow; cPow += 0.2){
+            double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
+            tempTrainBias = Math.pow(2, cPow);
+
+            System.out.print( String.format( "\t\tBIASPOW:2^%.2f", cPow ) ); long start = System.currentTimeMillis();
+            performCrossFoldValidationWithBias( splitCount, tempTrainBias, tempAcc, tempSens, tempSpec );
+            System.out.println(
+                    String.format(
+                            "/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d",
+                            tempAcc[0],tempSens[0],tempSpec[0], (System.currentTimeMillis()-start)/1000
+                    )
+            );
 
             if (bestAcc < tempAcc[0]){
                 bestAcc = tempAcc[0];
@@ -415,14 +442,16 @@ public class PvmSolver {
         }
     }
 
-    public void searchTrainParameters(int splitCount, int maxBestPositions, PvmTrainParameters trainParameters, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity) throws IloException, CloneNotSupportedException {
+    public void searchTrainParameters(int splitCount, KernelProductManager.KerType[] kernelTypes, PvmTrainParameters trainParameters, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity) throws IloException, CloneNotSupportedException {
         PvmTrainParameters tempParams = new PvmTrainParameters();
         int refinementLvl = 1;
         ArrayList<PvmTrainParameters> bestTrainParams = new ArrayList<PvmTrainParameters>();
 
-        for (KernelProductManager.KerType kerType : KernelProductManager.KerType.values()){
+
+        for (KernelProductManager.KerType kerType : kernelTypes){
+            //tempParams.kerType = KernelProductManager.KerType.KERRBF;
             tempParams.kerType = kerType;
-            KernelProductManager.setKernelTypeGlobal(kerType);
+            KernelProductManager.setKernelTypeGlobal(tempParams.kerType);
             tempParams.paramInt = KernelProductManager.getPreferedCenterInt();
             tempParams.paramDouble = KernelProductManager.getPreferedCenterDouble();
 
@@ -539,6 +568,6 @@ public class PvmSolver {
         MutableDouble acc = new MutableDouble(0), sens = new MutableDouble(0), spec = new MutableDouble(0);
 
         solver.core.ReadFile( args[0] );
-        solver.searchTrainParameters( 5, 5, bestTrainParams, acc, sens, spec );
+        solver.searchTrainParameters(10, KernelProductManager.KerType.values(), bestTrainParams, acc, sens, spec );
     }
 }
