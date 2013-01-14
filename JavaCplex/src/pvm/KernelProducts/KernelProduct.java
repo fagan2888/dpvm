@@ -15,6 +15,8 @@ public abstract class KernelProduct {
     protected KernelProductManager.KerType kerType;
     int refinementLvl = 1;
 
+    public abstract String getName();
+
     public abstract double computeKerProd(double [] x0, double [] x1);
     public abstract void setParamInt(int paramInt);
     public abstract void setParamDouble(double paramDouble);
@@ -42,4 +44,6 @@ public abstract class KernelProduct {
     public double computeKerProd(PvmEntry e0, PvmEntry e1){
         return computeKerProd(e0.x, e1.x);
     }
+
+    public KernelProductManager.KerType getKerType(){return kerType;}
 }

@@ -12,6 +12,7 @@ public class KernelProductScalar extends KernelProduct{
 
     public KernelProductScalar(){kerType = KernelProductManager.KerType.KERSCALAR;}
 
+    public String getName(){return "KERSCALAR";};
     public double computeKerProd(double [] x0, double [] x1){
         double ret = 0;
         int i, last_i = x0.length;

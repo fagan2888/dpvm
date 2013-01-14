@@ -140,4 +140,6 @@ public class KernelProductManager {
                 break;
             }
     }
+
+    public static KernelProduct[] getAvailableKernels(){return kernelProductManager.kernels;}
 }

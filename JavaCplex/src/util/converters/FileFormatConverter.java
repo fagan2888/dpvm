@@ -125,11 +125,6 @@ public class FileFormatConverter {
             ret.add(strLine.split(separator));
         }
 
-        for (String[] rec:ret)
-            for (int i = 0; i < rec.length - 1; i++)
-                if (rec[i].contentEquals("0"))
-                    rec[i] = "";
-
         return ret;
     }
 

@@ -30,6 +30,8 @@ public class KernelProductPoly extends KernelProduct {
         kerScalar = new KernelProductScalar();
     }
 
+    public String getName(){return "KERPOLY";};
+
     public double computeKerProd(double [] x0, double [] x1){
         double scalar = kerScalar.computeKerProd(x0, x1);
 

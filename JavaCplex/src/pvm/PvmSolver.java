@@ -198,6 +198,10 @@ public class PvmSolver {
         int i, solvesCount;
         core.Init(false);
 
+        accuracy[0]    = 0;
+        sensitivity[0] = 0;
+        specificity[0] = 0;
+
         ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices( splitCount );
 
         double foldAccuracy[]       = new double[splitCount];
@@ -339,7 +343,11 @@ public class PvmSolver {
         for (i = -maximumPositiveTrainBias; i <= maximumPositiveTrainBias; i++){
 
 	        double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
-	        tempTrainBias = Math.pow(2, (double)i);
+            tempAcc[0] = 0.0;
+            tempSens[0] = 0.0;
+            tempSpec[0] = 0.0;
+
+            tempTrainBias = Math.pow(2, (double)i);
 
 	        System.out.print( String.format( "\t\tBIASPOW:2^%2d", i ) ); long start = System.currentTimeMillis();
 	        performCrossFoldValidationWithBias( splitCount, tempTrainBias, tempAcc, tempSens, tempSpec );
@@ -365,6 +373,11 @@ public class PvmSolver {
         maxCPow += 1;
         for (cPow = maxCPow - 2; cPow < maxCPow; cPow += 0.2){
             double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
+            tempAcc[0] = 0.0;
+            tempSens[0] = 0.0;
+            tempSpec[0] = 0.0;
+
+
             tempTrainBias = Math.pow(2, cPow);
 
             System.out.print( String.format( "\t\tBIASPOW:2^%.2f", cPow ) ); long start = System.currentTimeMillis();
@@ -564,10 +577,37 @@ public class PvmSolver {
 	    try { SolverHelper.dropNativeCplex(); } catch ( URISyntaxException ignored ) {}
 
 	    PvmSolver solver = new PvmSolver();
-        PvmTrainParameters bestTrainParams = new PvmTrainParameters();
+        /*PvmTrainParameters bestTrainParams = new PvmTrainParameters();
         MutableDouble acc = new MutableDouble(0), sens = new MutableDouble(0), spec = new MutableDouble(0);
 
+        KernelProductManager.KerType kerTypes[] = new KernelProductManager.KerType[1];
+
+        kerTypes[0] = KernelProductManager.KerType.KERSCALAR;
         solver.core.ReadFile( args[0] );
-        solver.searchTrainParameters(10, KernelProductManager.KerType.values(), bestTrainParams, acc, sens, spec );
+        solver.searchTrainParameters(10, kerTypes, bestTrainParams, acc, sens, spec );*/
+
+        int i, pInt = 0;
+        double pDouble = 0.17677669529663667;
+        solver.core.ReadFile( args[0] );
+        KernelProductManager.setKernelTypeGlobal(KernelProductManager.KerType.KERRBF);
+        KernelProductManager.setParamInt(pInt);
+        KernelProductManager.setParamDouble(pDouble);
+
+        int runCount = 30;
+        double fAcc = 0, fSens = 0, fSpec = 0;
+        double tempAcc[] = new double[1];
+        double tempSens[] = new double[1];
+        double tempSpec[] = new double[1];
+
+        for (i = 0; i < runCount; i++){
+            solver.performCrossFoldValidationWithBias(10, 1.0, tempAcc, tempSens, tempSpec);
+            fAcc += tempAcc[0];
+            fSens += tempSens[0];
+            fSpec += tempSpec[0];
+        }
+
+        fAcc /= (double)runCount;
+        fSens /= (double)runCount;
+        fSpec /= (double)runCount;
     }
 }
