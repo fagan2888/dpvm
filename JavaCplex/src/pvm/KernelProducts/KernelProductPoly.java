@@ -49,10 +49,19 @@ public class KernelProductPoly extends KernelProduct {
     public double getPreferedCenterDouble(){return productOffsetInitialCenter;}
 
     public int getLowerBoundInt(int centerParamInt){
-        return centerParamInt - powerIntInitialRange / refinementLvl;
+        int ret = centerParamInt - powerIntInitialRange / refinementLvl;
+        if (ret < 1)
+            ret = 1;
+
+        return ret;
     }
     public int getUpperBoundInt(int centerParamInt){
-        return centerParamInt + powerIntInitialRange / refinementLvl;
+        int ret = centerParamInt + powerIntInitialRange / refinementLvl;
+
+        if (ret > powerIntInitialCenter + powerIntInitialRange)
+            ret = powerIntInitialCenter + powerIntInitialRange;
+
+        return ret;
     }
 
     public double getLowerBoundDouble(double centerParamDouble){
