@@ -213,7 +213,7 @@ public class PvmSolver {
         assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
 	    //splitCount = 1;
-	    ExecutorService executorService = Executors.newFixedThreadPool( 4 );
+	    ExecutorService executorService = Executors.newFixedThreadPool( 5 );
 
 	    // spawn a thread pool and add each fold as a task
         for ( i = 0; i<splitCount; i++ ) {
@@ -353,7 +353,7 @@ public class PvmSolver {
 	        performCrossFoldValidationWithBias( splitCount, tempTrainBias, tempAcc, tempSens, tempSpec );
 	        System.out.println(
 			    String.format(
-			        "/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d",
+			        "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d",
 				    tempAcc[0],tempSens[0],tempSpec[0], (System.currentTimeMillis()-start)/1000
 			    )
 	        );
@@ -384,7 +384,7 @@ public class PvmSolver {
             performCrossFoldValidationWithBias( splitCount, tempTrainBias, tempAcc, tempSens, tempSpec );
             System.out.println(
                     String.format(
-                            "/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d",
+                            "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d",
                             tempAcc[0],tempSens[0],tempSpec[0], (System.currentTimeMillis()-start)/1000
                     )
             );
@@ -442,7 +442,7 @@ public class PvmSolver {
                 tempParams.trainBias = searchPositiveTrainBias(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
 
 	            System.out.printf(
-		            "\tEVALUATED ->%s/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d\n",
+		            "\tEVALUATED ->%s/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d\n",
 		            tempParams,tempAccuracy.doubleValue(),tempSensitivity.doubleValue(),tempSpecificity.doubleValue(),(System.currentTimeMillis()-start)/1000
 	            );
 
@@ -459,17 +459,17 @@ public class PvmSolver {
         PvmTrainParameters tempParams = new PvmTrainParameters();
         int refinementLvl = 1;
         ArrayList<PvmTrainParameters> bestTrainParams = new ArrayList<PvmTrainParameters>();
-
+		long start;
 
         for (KernelProductManager.KerType kerType : kernelTypes){
-            //tempParams.kerType = KernelProductManager.KerType.KERRBF;
+            //tempParams.kerType = KernelProductManager.KerType.KERSCALAR;
             tempParams.kerType = kerType;
             KernelProductManager.setKernelTypeGlobal(tempParams.kerType);
             tempParams.paramInt = KernelProductManager.getPreferedCenterInt();
             tempParams.paramDouble = KernelProductManager.getPreferedCenterDouble();
 
 	        System.out.println( "EVALKERNEL: " + tempParams.kerType );
-	        long start = System.currentTimeMillis();
+	        start = System.currentTimeMillis();
 
 	        addLocalTrainParameters(splitCount, refinementLvl, tempParams, bestTrainParams);
 
@@ -489,7 +489,7 @@ public class PvmSolver {
         for (refinementLvl = 2; refinementLvl < 4; refinementLvl++){
             for (int i = bestTrainParams.size() - 1; i > 0; i--) {
 	            System.out.print( "EVAL/" + tempParams );
-	            long start = System.currentTimeMillis();
+	            start = System.currentTimeMillis();
                 addLocalTrainParameters(splitCount, refinementLvl, bestTrainParams.get(i), bestTrainParams);
 	            System.out.println( "/TIME:" + (System.currentTimeMillis()-start)*1000 );
             }
@@ -577,37 +577,15 @@ public class PvmSolver {
 	    try { SolverHelper.dropNativeCplex(); } catch ( URISyntaxException ignored ) {}
 
 	    PvmSolver solver = new PvmSolver();
-        /*PvmTrainParameters bestTrainParams = new PvmTrainParameters();
+        PvmTrainParameters bestTrainParams = new PvmTrainParameters();
         MutableDouble acc = new MutableDouble(0), sens = new MutableDouble(0), spec = new MutableDouble(0);
 
-        KernelProductManager.KerType kerTypes[] = new KernelProductManager.KerType[1];
-
-        kerTypes[0] = KernelProductManager.KerType.KERSCALAR;
         solver.core.ReadFile( args[0] );
-        solver.searchTrainParameters(10, kerTypes, bestTrainParams, acc, sens, spec );*/
 
-        int i, pInt = 0;
-        double pDouble = 0.17677669529663667;
-        solver.core.ReadFile( args[0] );
-        KernelProductManager.setKernelTypeGlobal(KernelProductManager.KerType.KERRBF);
-        KernelProductManager.setParamInt(pInt);
-        KernelProductManager.setParamDouble(pDouble);
+		KernelProductManager.KerType[] kernelTypes = new KernelProductManager.KerType[2];
+		kernelTypes[0] = KernelProductManager.KerType.KERSCALAR;
+		kernelTypes[1] = KernelProductManager.KerType.KERRBF;
 
-        int runCount = 30;
-        double fAcc = 0, fSens = 0, fSpec = 0;
-        double tempAcc[] = new double[1];
-        double tempSens[] = new double[1];
-        double tempSpec[] = new double[1];
-
-        for (i = 0; i < runCount; i++){
-            solver.performCrossFoldValidationWithBias(10, 1.0, tempAcc, tempSens, tempSpec);
-            fAcc += tempAcc[0];
-            fSens += tempSens[0];
-            fSpec += tempSpec[0];
-        }
-
-        fAcc /= (double)runCount;
-        fSens /= (double)runCount;
-        fSpec /= (double)runCount;
+        solver.searchTrainParameters(10, kernelTypes, bestTrainParams, acc, sens, spec );
     }
 }

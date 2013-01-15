@@ -9,8 +9,8 @@ import java.util.Comparator;
  * User: Andrei
  * Date: 1/6/13
  * Time: 4:05 PM
- * To change this template use File | Settings | File Templates.
  */
+
 public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParameters> {
     public KernelProductManager.KerType kerType = KernelProductManager.KerType.KERSCALAR;
     public int paramInt = 0;
@@ -66,9 +66,9 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
     }
 
     public int compare(PvmTrainParameters params1, PvmTrainParameters params2){
-        if (params1.accuracy < params2.accuracy)
+        if (params1.accuracy > params2.accuracy)
             return -1;
-        else if (params1.accuracy > params2.accuracy)
+        else if (params1.accuracy < params2.accuracy)
             return 1;
 
         return 0;
@@ -81,7 +81,7 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
 
 	public String toCompleteString() {
 		return toString()+ String.format(
-			"/ACC:%.03f/SENS:%.03f/SPEC:%.03f",
+			"/ACC:%.05f/SENS:%.05f/SPEC:%.05f",
 			accuracy, sensitivity, specificity
 		);
 	}

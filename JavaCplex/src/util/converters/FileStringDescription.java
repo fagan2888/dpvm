@@ -8,8 +8,8 @@ import java.util.ArrayList;
  * User: Andrei
  * Date: 12/8/12
  * Time: 3:40 PM
- * To change this template use File | Settings | File Templates.
  */
+
 public class FileStringDescription {
     ArrayList<String[]> srcStrings = null;
 
@@ -89,7 +89,14 @@ public class FileStringDescription {
         }
 
         for (String [] rec : srcStrings){
-            addCategoricalRecordFeature(labelIdx, rec[labelIdx]);
+
+	        /*
+	        for ( String s : rec) {
+		        System.out.print( s + "," );
+	        }System.out.println();
+	        */
+
+	        addCategoricalRecordFeature( labelIdx, rec[ labelIdx ] );
 
             for (i = first_i; i < last_i; i++){
 
