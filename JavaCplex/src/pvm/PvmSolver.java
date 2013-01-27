@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -26,32 +28,31 @@ import java.util.concurrent.TimeUnit;
 public class PvmSolver {
     public PvmDataCore core;
     public PvmSystem pvmSys;
-    public static int maximumPositiveTrainBias = 5;
-    public int maxBestPositions = 5;
+    public static int MAX_POS_TRAIN_BIAS = 5;
+    public static int MAX_BEST_POSITIONS = 5;
+	public static double NOISE_DIST_INSTDEV_FROM_HP = 1.0;
 
     public PvmSolver(){
 	    core = new PvmDataCore();
         pvmSys = new PvmSystem();
     }
-    public boolean Train(){
+    public boolean Train() {
         double t_l = 0.0, t_r = 1.0, t_c;
         core.Init();
 
         pvmSys.BuildSystemFor(core, 1.0, false, false);
 
-        while (!pvmSys.Solve() && t_r < 1e+10)
-        {
+        while (!pvmSys.Solve() && t_r < 1e+10) {
             t_l = t_r;
             t_r = 2 * t_r + 1;
 
             pvmSys.AddFinalTConstraints(t_r);
-        };
+        }
 
         if (t_r >= 1e+10)
             return false;
 
-        while (t_r - t_l > 1e-8)
-        {
+        while (t_r - t_l > 1e-8) {
             t_c = (t_l + t_r) / 2.0;
 
             pvmSys.AddFinalTConstraints(t_c);
@@ -75,13 +76,12 @@ public class PvmSolver {
 
         pvmSys.BuildSystemFor(core, 1.0, false, false);
 
-        while (!pvmSys.solveDistributed() && t_r < 1e+10)
-        {
+        while (!pvmSys.solveDistributed() && t_r < 1e+10) {
             t_l = t_r;
             t_r = 2 * t_r + 1;
 
             pvmSys.replaceFinalTConstraintsDistributed( t_r );
-        };
+        }
 
         if (t_r >= 1e+10)
             return false;
@@ -133,6 +133,7 @@ public class PvmSolver {
 
         ret = pvmSys.solveSingleLPWithBias( resT, positiveBias );
 
+	    // the case where stdev is 0
         if (ret && resT[0] == 0.0)
         {
             pvmSys.buildSecondaryLpSystem(core);
@@ -143,7 +144,65 @@ public class PvmSolver {
         return ret;
     }
 
-    public boolean classify(PvmEntry src){
+	public boolean TrainSingleLPWithBiasAndNoiseElimination( double positiveBias ) throws IloException {
+		boolean retVal;
+		double [] resT = new double[1];
+
+		core.Init();
+		pvmSys.buildSingleLPSystemWithBias( core, positiveBias );
+		retVal = pvmSys.solveSingleLPWithBias( resT, positiveBias );
+
+		// the case where stdev is 0
+		if ( retVal && resT[0] == 0.0 ) {
+			pvmSys.buildSecondaryLpSystem( core );
+			retVal = pvmSys.solveSingleLPSecondary( resT, positiveBias );
+			return retVal;
+		}
+
+		// the case where we try to eliminate noisy records
+
+		List<Map.Entry<Double, Integer>> recDist2Hp = core.getNormalizedSignedDistancesWithIndexPos();
+		recDist2Hp.addAll( core.getNormalizedSignedDistancesWithIndexNeg() );
+
+		ArrayList<PvmEntry> toRemove = new ArrayList<PvmEntry>();
+		for ( Map.Entry<Double, Integer> entry : recDist2Hp ) {
+			double   distance = entry.getKey();
+			int      recordIndex = entry.getValue();
+
+			PvmEntry subjectRecord = core.entries.get( recordIndex );
+			if ( ( Math.abs( distance ) > NOISE_DIST_INSTDEV_FROM_HP ) &&
+				 ( (subjectRecord.label && distance < 0) || (!subjectRecord.label && distance > 0) ) ) {
+
+				System.out.printf( "th: %d -> removing record with dist: %.04f / index: %d / pos: %s\n",
+					Thread.currentThread().getId(),
+					distance, recordIndex, subjectRecord.label );
+
+				toRemove.add( core.entries.get( recordIndex ) );
+			}
+		}
+
+		if ( toRemove.size() == 0 ) { return retVal; }
+
+		// remove the unwanted records/entries
+		core.entries.removeAll( toRemove );
+
+		// rebuild gram matrix.. etc
+		core.Init();
+		pvmSys.buildSingleLPSystemWithBias( core, positiveBias );
+		retVal = pvmSys.solveSingleLPWithBias( resT, positiveBias );
+
+		// the case where stdev is 0
+		if ( retVal && resT[0] == 0.0 ) {
+			pvmSys.buildSecondaryLpSystem( core );
+			retVal = pvmSys.solveSingleLPSecondary( resT, positiveBias );
+			return retVal;
+		}
+
+		return retVal;
+	}
+
+
+	public boolean classify(PvmEntry src){
         return core.classify(src);
     }
 
@@ -196,13 +255,13 @@ public class PvmSolver {
 
     public void performCrossFoldValidationWithBias(int splitCount, double positiveBias, boolean solvedFlags[], double accuracy[], double sensitivity[], double specificity[]) throws IloException {
 
-	    core.Init(false);
+	    core.Init( false );
         ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices( splitCount );
 
         assert( splitCount == splitCores.size() );
         assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
-	    ExecutorService executorService = Executors.newFixedThreadPool( 2 );
+	    ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
 
 	    // spawn a thread pool and add each fold as a task
         for ( int i = 0; i<splitCount; i++ ) {
@@ -255,31 +314,32 @@ public class PvmSolver {
         fw.close();
     }
 
-    public double searchPositiveTrainBias(int splitCount, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity) throws IloException {
+    public double searchPositiveTrainBias( int splitCount, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity ) throws IloException {
         int i;
         double cPow, maxCPow = 0, bestTrainBias = 1.0, trainBias;
         double bestAcc = 0.0;
 
-        for (i = -maximumPositiveTrainBias; i <= maximumPositiveTrainBias; i++){
+        for (i = -MAX_POS_TRAIN_BIAS; i <= MAX_POS_TRAIN_BIAS; i++){
 
-	        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
 	        double meanAcc = 0, meanSens = 0, meanSpec = 0;
-	        boolean foldSolvedFlags[] = new boolean[splitCount];
-
             trainBias = Math.pow(2, (double)i);
 
-	        System.out.printf( "\t\tBIASPOW:2^%2d\n", i ); long start = System.currentTimeMillis();
-
-	        performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+	        System.out.printf( "\t\tBIASPOW:2^%2d", i ); long start = System.currentTimeMillis();
 
 	        double solvesCount = 0;
-	        for ( int j=0; j<splitCount; j++ ) {
+	        for ( int k=0; k<5; k++ ) {
 
-		        if ( foldSolvedFlags[ j ] ) {
-			        solvesCount++;
-			        meanAcc  += foldAcc[ j ];
-			        meanSens += foldSens[ j ];
-			        meanSpec += foldSpec[ j ];
+		        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
+		        boolean foldSolvedFlags[] = new boolean[splitCount];
+
+	            performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+		        for ( int j=0; j<splitCount; j++ ) {
+			        if ( foldSolvedFlags[j] ) {
+				        solvesCount++;
+				        meanAcc  += foldAcc[j];
+				        meanSens += foldSens[j];
+				        meanSpec += foldSpec[j];
+			        }
 		        }
 	        }
 
@@ -294,7 +354,7 @@ public class PvmSolver {
 				meanAcc,meanSens,meanSpec, (System.currentTimeMillis()-start)/1000
 	        );
 
-            if ( bestAcc < meanAcc ){
+            if ( bestAcc < meanAcc ) {
                 bestAcc = meanAcc;
                 bestTrainBias = trainBias;
                 maxCPow = i;
@@ -305,27 +365,30 @@ public class PvmSolver {
             }
         }
 
-
         maxCPow += 1;
-        for (cPow = maxCPow - 2; cPow < maxCPow; cPow += 0.2){
+        for ( cPow = maxCPow - 2; cPow < maxCPow; cPow += 0.2 ) {
 
-	        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
 	        double meanAcc = 0, meanSens = 0, meanSpec = 0;
-	        boolean foldSolvedFlags[] = new boolean[splitCount];
 
-            trainBias = Math.pow(2, cPow);
+            trainBias = Math.pow( 2, cPow );
 
             System.out.print( String.format( "\t\tBIASPOW:2^%.2f", cPow ) ); long start = System.currentTimeMillis();
-	        performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
 
 	        double solvesCount = 0;
-	        for ( int j=0; j<splitCount; j++ ) {
+	        for ( int k=0; k<3; k++ ) {
+		        boolean foldSolvedFlags[] = new boolean[splitCount];
+		        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
 
-		        if ( foldSolvedFlags[ j ] ) {
-			        solvesCount++;
-			        meanAcc  += foldAcc[ j ];
-			        meanSens += foldSens[ j ];
-			        meanSpec += foldSpec[ j ];
+		        performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+
+		        for ( int j=0; j<splitCount; j++ ) {
+
+			        if ( foldSolvedFlags[j] ) {
+				        solvesCount++;
+				        meanAcc  += foldAcc[j];
+				        meanSens += foldSens[j];
+				        meanSpec += foldSpec[j];
+			        }
 		        }
 	        }
 
@@ -340,10 +403,9 @@ public class PvmSolver {
 		        meanAcc, meanSens, meanSpec, ( System.currentTimeMillis() - start ) / 1000
 	        );
 
-	        if ( bestAcc < meanAcc ){
+	        if ( bestAcc < meanAcc ) {
 		        bestAcc = meanAcc;
 		        bestTrainBias = trainBias;
-		        maxCPow = i;
 
 		        accuracy.setValue( meanAcc );
 		        sensitivity.setValue( meanSens );
@@ -429,7 +491,7 @@ public class PvmSolver {
         }
 
         Collections.sort(bestTrainParams, tempParams);
-        while (bestTrainParams.size() > maxBestPositions)
+        while (bestTrainParams.size() > MAX_BEST_POSITIONS )
             bestTrainParams.remove(bestTrainParams.size() - 1);
 
 	    System.out.println( "Found best train params: " );
@@ -447,7 +509,7 @@ public class PvmSolver {
             }
 
             Collections.sort(bestTrainParams, tempParams);
-            while (bestTrainParams.size() > maxBestPositions)
+            while (bestTrainParams.size() > MAX_BEST_POSITIONS )
                 bestTrainParams.remove(bestTrainParams.size() - 1);
         }
 
@@ -509,7 +571,9 @@ public class PvmSolver {
 
 			try {
 				solvedFlags[split] = true;
+
 				if ( !localSlv.TrainSingleLPWithBias( positiveBias ) ) {
+				//if ( !localSlv.TrainSingleLPWithBiasAndNoiseElimination( positiveBias ) ) {
 					solvedFlags[split] = false;
 					return;
 				}
@@ -538,6 +602,6 @@ public class PvmSolver {
 		kernelTypes[0] = KernelProductManager.KerType.KERSCALAR;
 		kernelTypes[1] = KernelProductManager.KerType.KERRBF;
 
-        solver.searchTrainParameters(10, kernelTypes, bestTrainParams, acc, sens, spec );
+        solver.searchTrainParameters( 10, kernelTypes, bestTrainParams, acc, sens, spec );
     }
 }

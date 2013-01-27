@@ -762,15 +762,15 @@ public class PvmSystem {
         return true;
     }
 
-    public boolean solveSingleLPWithBias(double [] resT, double positiveTrainBias) throws IloException {
+    public boolean solveSingleLPWithBias( double [] resT, double positiveTrainBias ) throws IloException {
         int i;
 
-        if (!cplex.solve())
-            return false;
+	    // the actual solving of the system
+        if ( !cplex.solve() ) return false;
 
-        assert (resT.length > 0);
+        assert ( resT.length > 0 );
 
-        double [] x = cplex.getValues(vars);
+        double [] x = cplex.getValues( vars );
 
         for (i = 0; i < baseCount; i++)
             core.alphas[i] = x[i];
@@ -778,7 +778,7 @@ public class PvmSystem {
         for (i = 0; i < baseCount; i++)
             core.sigmas[i] = x[i + baseCount];
 
-        core.recomputeHyperplaneBias(resT, positiveTrainBias);
+        core.recomputeHyperplaneBias( resT, positiveTrainBias );
         //core.recomputeHyperplaneBiasOptimizingAccuracy();
         //if (!core.recomputeHyperplaneBiasOptimizingIQR())
           //  core.recomputeHyperplaneBias(resT, positiveTrainBias);
@@ -912,7 +912,7 @@ public class PvmSystem {
         if ( !verbalize ) { cplex.setOut(null); }
 
 	    cplex.setParam( IloCplex.BooleanParam.NumericalEmphasis, true );
-	    cplex.setParam( IloCplex.IntParam.Threads, 4 );
+	    cplex.setParam( IloCplex.IntParam.Threads, 2 );
 	    //cplex.setParam( IloCplex.IntParam.ParallelMode, IloCplex.ParallelMode.Deterministic );
 
 	    //cplex.setParam( IloCplex.IntParam.RootAlg, IloCplex.Algorithm.Dual );

@@ -79,42 +79,43 @@ public class FoldRunner {
 
             solver.performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
 
+	        double foldMeanAcc = 0, foldMeanSens = 0, foldMeanSpec = 0;
+	        double foldSolveCount = 0.0;
 	        for ( int j=0; j<splitCount; j++ ) {
-		        runSolvedFlags[i*splitCount + j] = foldSolvedFlags[j];
-	            runAccs[i*splitCount + j] = foldAcc[j];
-	            runSens[i*splitCount + j] = foldSens[j];
-	            runSpec[i*splitCount + j] = foldSpec[j];
-
-		        System.out.printf(
-			        "RUN:%03d->ACC:%.05f/SENS:%.05f/SPEC:%.05f\n",
-			        i*splitCount+j,foldAcc[j],foldSens[j],foldSpec[j]
-		        );
+		        if ( !foldSolvedFlags[j] ) continue;
+		        foldSolveCount ++;
+		        foldMeanAcc += foldAcc[j];
+	            foldMeanSens += foldSens[j];
+	            foldMeanSpec += foldSpec[j];
 	        }
+	        foldMeanAcc /= foldSolveCount; foldMeanSens /= foldSolveCount; foldMeanSpec /= foldSolveCount;
+	        runAccs[i] = foldMeanAcc;
+	        runSens[i] = foldMeanSens;
+	        runSpec[i] = foldMeanSpec;
+
+	        System.out.printf(
+		        "RUN:%03d->ACC:%.05f/SENS:%.05f/SPEC:%.05f\n",
+		        i, runAccs[i], runSens[i], runSpec[i]
+	        );
         }
 
 	    // take mean of accs, sens and spec
 
 	    double meanAcc = 0, meanSens = 0, meanSpec = 0;
-	    double solvesCount = 0.0;
 
-	    for ( i=0; i < runCount * splitCount; i++) {
-		    if ( runSolvedFlags[i] ) {
-			    solvesCount ++;
-			    meanAcc += runAccs[i]; meanSens += runSens[i]; meanSpec += runSpec[i];
-		    }
+	    for ( i=0; i < runCount; i++) {
+		    meanAcc += runAccs[i]; meanSens += runSens[i]; meanSpec += runSpec[i];
 	    }
 
-	    meanAcc  /= solvesCount;
-        meanSens /= solvesCount;
-        meanSpec /= solvesCount;
+	    meanAcc  /= runCount;
+        meanSens /= runCount;
+        meanSpec /= runCount;
 
         double devAcc = 0, devSens = 0, devSpec = 0;
         double temp;
 
 	    // compute stddevs
         for (i = 0; i < runCount; i++){
-	        if ( !runSolvedFlags[i] ) continue;
-
             temp = runAccs[i] - meanAcc;
             devAcc += temp * temp;
 
@@ -125,12 +126,12 @@ public class FoldRunner {
             devSpec += temp * temp;
         }
 
-        devAcc  /= solvesCount; devAcc  = Math.sqrt( devAcc  );
-        devSens /= solvesCount; devSens = Math.sqrt( devSens );
-        devSpec /= solvesCount; devSpec = Math.sqrt( devSpec );
+        devAcc  /= runCount; devAcc  = Math.sqrt( devAcc  );
+        devSens /= runCount; devSens = Math.sqrt( devSens );
+        devSpec /= runCount; devSpec = Math.sqrt( devSpec );
 
 	    System.out.printf(
-		    "\nMEAN->ACC:%.05f/SENS:%.05f/SPEC:%.05f\n",
+		    "\nMEAN ->ACC:%.05f/SENS:%.05f/SPEC:%.05f\n",
 		    meanAcc,meanSens,meanSpec
 	    );
 
