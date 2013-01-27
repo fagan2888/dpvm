@@ -13,8 +13,8 @@ import java.net.URISyntaxException;
  * User: Andrei
  * Date: 1/14/13
  * Time: 10:06 PM
- * To change this template use File | Settings | File Templates.
  */
+
 public class FoldRunner {
 
     public static boolean checkMainArgs(String[] args){
@@ -50,6 +50,8 @@ public class FoldRunner {
 
         PvmSolver solver = new PvmSolver();
 
+	    int splitCount = 10;
+
         int runCount = Integer.valueOf(args[5]);
         int paramInt = Integer.valueOf(args[3]);
         double paramDouble = Double.valueOf(args[4]);
@@ -62,53 +64,81 @@ public class FoldRunner {
         KernelProductManager.setParamInt(paramInt);
         KernelProductManager.setParamDouble(paramDouble);
 
-        double runAccs[] = new double[runCount];
-        double runSens[] = new double[runCount];
-        double runSpec[] = new double[runCount];
+        double runAccs[] = new double[runCount * splitCount];
+        double runSens[] = new double[runCount * splitCount];
+        double runSpec[] = new double[runCount * splitCount];
+	    boolean runSolvedFlags [] = new boolean[ runCount * splitCount ];
 
-        double fAcc = 0, fSens = 0, fSpec = 0;
-        double tempAcc[] = new double[1];
-        double tempSens[] = new double[1];
-        double tempSpec[] = new double[1];
+        double foldAcc[]  = new double[ splitCount ];
+        double foldSens[] = new double[ splitCount ];
+        double foldSpec[] = new double[ splitCount ];
+	    boolean foldSolvedFlags [] = new boolean[ splitCount ];
 
+	    // perform runs
         for (i = 0; i < runCount; i++){
-            solver.performCrossFoldValidationWithBias(10, trainBias, tempAcc, tempSens, tempSpec);
-            runAccs[i] = tempAcc[0];
-            runSens[i] = tempSens[0];
-            runSpec[i] = tempSpec[0];
 
-            fAcc += tempAcc[0];
-            fSens += tempSens[0];
-            fSpec += tempSpec[0];
+            solver.performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+
+	        double foldMeanAcc = 0, foldMeanSens = 0, foldMeanSpec = 0;
+	        double foldSolveCount = 0.0;
+	        for ( int j=0; j<splitCount; j++ ) {
+		        if ( !foldSolvedFlags[j] ) continue;
+		        foldSolveCount ++;
+		        foldMeanAcc += foldAcc[j];
+	            foldMeanSens += foldSens[j];
+	            foldMeanSpec += foldSpec[j];
+	        }
+	        foldMeanAcc /= foldSolveCount; foldMeanSens /= foldSolveCount; foldMeanSpec /= foldSolveCount;
+	        runAccs[i] = foldMeanAcc;
+	        runSens[i] = foldMeanSens;
+	        runSpec[i] = foldMeanSpec;
+
+	        System.out.printf(
+		        "RUN:%03d->ACC:%.05f/SENS:%.05f/SPEC:%.05f\n",
+		        i, runAccs[i], runSens[i], runSpec[i]
+	        );
         }
 
-        fAcc /= (double)runCount;
-        fSens /= (double)runCount;
-        fSpec /= (double)runCount;
+	    // take mean of accs, sens and spec
+
+	    double meanAcc = 0, meanSens = 0, meanSpec = 0;
+
+	    for ( i=0; i < runCount; i++) {
+		    meanAcc += runAccs[i]; meanSens += runSens[i]; meanSpec += runSpec[i];
+	    }
+
+	    meanAcc  /= runCount;
+        meanSens /= runCount;
+        meanSpec /= runCount;
 
         double devAcc = 0, devSens = 0, devSpec = 0;
         double temp;
 
+	    // compute stddevs
         for (i = 0; i < runCount; i++){
-            temp = runAccs[i] - fAcc;
+            temp = runAccs[i] - meanAcc;
             devAcc += temp * temp;
 
-            temp = runSens[i] - fSens;
+            temp = runSens[i] - meanSens;
             devSens += temp * temp;
 
-            temp = runSpec[i] - fSpec;
+            temp = runSpec[i] - meanSpec;
             devSpec += temp * temp;
         }
 
-        devAcc /= (double)runCount;
-        devSens /= (double)runCount;
-        devSpec /= (double)runCount;
+        devAcc  /= runCount; devAcc  = Math.sqrt( devAcc  );
+        devSens /= runCount; devSens = Math.sqrt( devSens );
+        devSpec /= runCount; devSpec = Math.sqrt( devSpec );
 
-        devAcc = Math.sqrt(devAcc);
-        devSens = Math.sqrt(devSens);
-        devSpec = Math.sqrt(devSpec);
+	    System.out.printf(
+		    "\nMEAN ->ACC:%.05f/SENS:%.05f/SPEC:%.05f\n",
+		    meanAcc,meanSens,meanSpec
+	    );
 
-        System.out.println(String.format("Acc:%f Sens:%f Spec:%f", fAcc, fSens, fSpec));
-        System.out.println(String.format("StdDevAcc:%f StdDevSens:%f StdDevSpec:%f", devAcc, devSens, devSpec));
+	    System.out.printf(
+		    "STDEV->ACC:%.05f/SENS:%.05f/SPEC:%.05f\n",
+		    devAcc,devSens,devSpec
+	    );
+
     }
 }

@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -26,8 +28,9 @@ import java.util.concurrent.TimeUnit;
 public class PvmSolver {
     public PvmDataCore core;
     public PvmSystem pvmSys;
-    public static int maximumPositiveTrainBias = 5;
-    public int maxBestPositions = 5;
+    public static int MAX_POS_TRAIN_BIAS = 5;
+    public static int MAX_BEST_POSITIONS = 5;
+	public static double NOISE_DIST_INSTDEV_FROM_HP = 1.0;
 
     public PvmSolver(){
 	    core = new PvmDataCore();
@@ -39,19 +42,17 @@ public class PvmSolver {
 
         pvmSys.BuildSystemFor(core, 1.0, false, false);
 
-        while (!pvmSys.Solve() && t_r < 1e+10)
-        {
+        while (!pvmSys.Solve() && t_r < 1e+10) {
             t_l = t_r;
             t_r = 2 * t_r + 1;
 
             pvmSys.AddFinalTConstraints(t_r);
-        };
+        }
 
         if (t_r >= 1e+10)
             return false;
 
-        while (t_r - t_l > 1e-8)
-        {
+        while (t_r - t_l > 1e-8) {
             t_c = (t_l + t_r) / 2.0;
 
             pvmSys.AddFinalTConstraints(t_c);
@@ -75,13 +76,12 @@ public class PvmSolver {
 
         pvmSys.BuildSystemFor(core, 1.0, false, false);
 
-        while (!pvmSys.solveDistributed() && t_r < 1e+10)
-        {
+        while (!pvmSys.solveDistributed() && t_r < 1e+10) {
             t_l = t_r;
             t_r = 2 * t_r + 1;
 
             pvmSys.replaceFinalTConstraintsDistributed( t_r );
-        };
+        }
 
         if (t_r >= 1e+10)
             return false;
@@ -133,6 +133,7 @@ public class PvmSolver {
 
         ret = pvmSys.solveSingleLPWithBias( resT, positiveBias );
 
+	    // the case where stdev is 0
         if (ret && resT[0] == 0.0)
         {
             pvmSys.buildSecondaryLpSystem(core);
@@ -143,7 +144,65 @@ public class PvmSolver {
         return ret;
     }
 
-    public boolean classify(PvmEntry src){
+	public boolean TrainSingleLPWithBiasAndNoiseElimination( double positiveBias ) throws IloException {
+		boolean retVal;
+		double [] resT = new double[1];
+
+		core.Init();
+		pvmSys.buildSingleLPSystemWithBias( core, positiveBias );
+		retVal = pvmSys.solveSingleLPWithBias( resT, positiveBias );
+
+		// the case where stdev is 0
+		if ( retVal && resT[0] == 0.0 ) {
+			pvmSys.buildSecondaryLpSystem( core );
+			retVal = pvmSys.solveSingleLPSecondary( resT, positiveBias );
+			return retVal;
+		}
+
+		// the case where we try to eliminate noisy records
+
+		List<Map.Entry<Double, Integer>> recDist2Hp = core.getNormalizedSignedDistancesWithIndexPos();
+		recDist2Hp.addAll( core.getNormalizedSignedDistancesWithIndexNeg() );
+
+		ArrayList<PvmEntry> toRemove = new ArrayList<PvmEntry>();
+		for ( Map.Entry<Double, Integer> entry : recDist2Hp ) {
+			double   distance = entry.getKey();
+			int      recordIndex = entry.getValue();
+
+			PvmEntry subjectRecord = core.entries.get( recordIndex );
+			if ( ( Math.abs( distance ) > NOISE_DIST_INSTDEV_FROM_HP ) &&
+				 ( (subjectRecord.label && distance < 0) || (!subjectRecord.label && distance > 0) ) ) {
+
+				System.out.printf( "th: %d -> removing record with dist: %.04f / index: %d / pos: %s\n",
+					Thread.currentThread().getId(),
+					distance, recordIndex, subjectRecord.label );
+
+				toRemove.add( core.entries.get( recordIndex ) );
+			}
+		}
+
+		if ( toRemove.size() == 0 ) { return retVal; }
+
+		// remove the unwanted records/entries
+		core.entries.removeAll( toRemove );
+
+		// rebuild gram matrix.. etc
+		core.Init();
+		pvmSys.buildSingleLPSystemWithBias( core, positiveBias );
+		retVal = pvmSys.solveSingleLPWithBias( resT, positiveBias );
+
+		// the case where stdev is 0
+		if ( retVal && resT[0] == 0.0 ) {
+			pvmSys.buildSecondaryLpSystem( core );
+			retVal = pvmSys.solveSingleLPSecondary( resT, positiveBias );
+			return retVal;
+		}
+
+		return retVal;
+	}
+
+
+	public boolean classify(PvmEntry src){
         return core.classify(src);
     }
 
@@ -194,37 +253,26 @@ public class PvmSolver {
         accuracy[split] = (double)(tp + tn) / (double)(entries.size());
     }
 
-    public void performCrossFoldValidationWithBias(int splitCount, double positiveBias, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
-        int i, solvesCount;
-        core.Init(false);
+    public void performCrossFoldValidationWithBias(int splitCount, double positiveBias, boolean solvedFlags[], double accuracy[], double sensitivity[], double specificity[]) throws IloException {
 
-        accuracy[0]    = 0;
-        sensitivity[0] = 0;
-        specificity[0] = 0;
-
+	    core.Init( false );
         ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices( splitCount );
-
-        double foldAccuracy[]       = new double[splitCount];
-        double foldSensitivity[]    = new double[splitCount];
-        double foldSpecificity[]    = new double[splitCount];
-	    boolean foldSolvedFlags[]   = new boolean[splitCount];
 
         assert( splitCount == splitCores.size() );
         assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
-	    //splitCount = 1;
-	    ExecutorService executorService = Executors.newFixedThreadPool( 4 );
+	    ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
 
 	    // spawn a thread pool and add each fold as a task
-        for ( i = 0; i<splitCount; i++ ) {
+        for ( int i = 0; i<splitCount; i++ ) {
 
-	        foldAccuracy[i]    = 0.0;
-	        foldSensitivity[i] = 0.0;
-	        foldSpecificity[i] = 0.0;
-	        foldSolvedFlags[i] = false;
+	        accuracy[i]    = 0.0;
+	        sensitivity[i] = 0.0;
+	        specificity[i] = 0.0;
+	        solvedFlags[i] = false;
 
 	        SolverFoldRunnable foldRunnable = new SolverFoldRunnable( splitCores, i, positiveBias );
-	        foldRunnable.setResultVectors( foldAccuracy, foldSensitivity, foldSpecificity, foldSolvedFlags );
+	        foldRunnable.setResultVectors( accuracy, sensitivity, specificity, solvedFlags );
 
 	        executorService.submit( foldRunnable );
         }
@@ -237,79 +285,10 @@ public class PvmSolver {
 	    } catch ( InterruptedException e ) {
 		    e.printStackTrace();
 	    }
-
-	    solvesCount = 0;
-	    for ( i=0; i<splitCount; i++ ) {
-
-		    if ( foldSolvedFlags[i] ) {
-			    solvesCount++;
-			    accuracy[0]    += foldAccuracy[i];
-			    sensitivity[0] += foldSensitivity[i];
-			    specificity[0] += foldSpecificity[i];
-		    }
-	    }
-
-	    if ( solvesCount > 0 ) {
-            accuracy[0]    /= (double)solvesCount;
-            sensitivity[0] /= (double)solvesCount;
-            specificity[0] /= (double)solvesCount;
-        }
     }
 
-    public void performCrossFoldValidation(int splitCount, double accuracy[], double sensitivity[], double specificity[]) throws IloException {
-        performCrossFoldValidationWithBias(splitCount, 1.0, accuracy, sensitivity, specificity);
-    }
-
-    public void searchKernel(int splitCount) throws IloException {
-
-        int i, last_i;
-        KernelProductManager.KerType bestKerType = KernelProductManager.KerType.KERSCALAR;
-        double bestParamD = 0.0;
-        int bestParamI = 0;
-
-        double tempParamD;
-        int tempParamI;
-
-        double bestAcc = 0.0;
-
-        double tempAccuracy[] = new double[1];
-        double tempSensitivity[] = new double[1];
-        double tempSpecificity[] = new double[1];
-
-
-        for (KernelProductManager.KerType kerType : KernelProductManager.KerType.values())
-        {
-            //KernelProductManager.KerType kerType = KernelProductManager.KerType.KERRBF;
-            KernelProductManager.setKernelTypeGlobal(kerType);
-
-            last_i = KernelProductManager.getParamDoubleMaxStepsCount();
-
-            for (i = 0; i < last_i; i++){
-                tempParamD = KernelProductManager.getParamDValue(i, last_i);
-                KernelProductManager.setParamDouble(tempParamD);
-
-                for (tempParamI = KernelProductManager.getMinParamI(); tempParamI <= KernelProductManager.getMaxParamI(); tempParamI++)
-                {
-                    System.gc();
-
-                    KernelProductManager.setParamInt( tempParamI );
-
-                    performCrossFoldValidation(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
-
-                    if (tempAccuracy[0] > bestAcc)
-                    {
-                        bestAcc = tempAccuracy[0];
-                        bestKerType = kerType;
-                        bestParamD = tempParamD;
-                        bestParamI = tempParamI;
-                    }
-                }
-            }
-        }
-
-        KernelProductManager.setKernelTypeGlobal(bestKerType);
-        KernelProductManager.setParamInt(bestParamI);
-        KernelProductManager.setParamDouble(bestParamD);
+    public void performCrossFoldValidation(int splitCount, boolean solvedFlags[], double accuracy[], double sensitivity[], double specificity[]) throws IloException {
+        performCrossFoldValidationWithBias(splitCount, 1.0, solvedFlags, accuracy, sensitivity, specificity);
     }
 
     public void writeNormalizedDistancesToFiles(String fileNamePos, String fileNameNeg) throws IloException, IOException {
@@ -335,68 +314,103 @@ public class PvmSolver {
         fw.close();
     }
 
-    public double searchPositiveTrainBias(int splitCount, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity) throws IloException {
+    public double searchPositiveTrainBias( int splitCount, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity ) throws IloException {
         int i;
-        double cPow, maxCPow = 0, bestTrainBias = 1.0, tempTrainBias;
+        double cPow, maxCPow = 0, bestTrainBias = 1.0, trainBias;
         double bestAcc = 0.0;
 
-        for (i = -maximumPositiveTrainBias; i <= maximumPositiveTrainBias; i++){
+        for (i = -MAX_POS_TRAIN_BIAS; i <= MAX_POS_TRAIN_BIAS; i++){
 
-	        double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
-            tempAcc[0] = 0.0;
-            tempSens[0] = 0.0;
-            tempSpec[0] = 0.0;
+	        double meanAcc = 0, meanSens = 0, meanSpec = 0;
+            trainBias = Math.pow(2, (double)i);
 
-            tempTrainBias = Math.pow(2, (double)i);
+	        System.out.printf( "\t\tBIASPOW:2^%2d", i ); long start = System.currentTimeMillis();
 
-	        System.out.print( String.format( "\t\tBIASPOW:2^%2d", i ) ); long start = System.currentTimeMillis();
-	        performCrossFoldValidationWithBias( splitCount, tempTrainBias, tempAcc, tempSens, tempSpec );
-	        System.out.println(
-			    String.format(
-			        "/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d",
-				    tempAcc[0],tempSens[0],tempSpec[0], (System.currentTimeMillis()-start)/1000
-			    )
+	        double solvesCount = 0;
+	        for ( int k=0; k<5; k++ ) {
+
+		        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
+		        boolean foldSolvedFlags[] = new boolean[splitCount];
+
+	            performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+		        for ( int j=0; j<splitCount; j++ ) {
+			        if ( foldSolvedFlags[j] ) {
+				        solvesCount++;
+				        meanAcc  += foldAcc[j];
+				        meanSens += foldSens[j];
+				        meanSpec += foldSpec[j];
+			        }
+		        }
+	        }
+
+	        if ( solvesCount > 0 ) {
+		        meanAcc  /= solvesCount;
+		        meanSens /= solvesCount;
+		        meanSpec /= solvesCount;
+	        }
+
+	        System.out.printf(
+		        "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d\n",
+				meanAcc,meanSens,meanSpec, (System.currentTimeMillis()-start)/1000
 	        );
 
-            if (bestAcc < tempAcc[0]){
-                bestAcc = tempAcc[0];
-                bestTrainBias = tempTrainBias;
+            if ( bestAcc < meanAcc ) {
+                bestAcc = meanAcc;
+                bestTrainBias = trainBias;
                 maxCPow = i;
 
-                accuracy.setValue(tempAcc[0]);
-                sensitivity.setValue(tempSens[0]);
-                specificity.setValue(tempSpec[0]);
+                accuracy.setValue( meanAcc );
+                sensitivity.setValue( meanSens );
+                specificity.setValue( meanSpec );
             }
         }
 
-
         maxCPow += 1;
-        for (cPow = maxCPow - 2; cPow < maxCPow; cPow += 0.2){
-            double tempAcc[] = new double[1], tempSens[] = new double[1], tempSpec[] = new double[1];
-            tempAcc[0] = 0.0;
-            tempSens[0] = 0.0;
-            tempSpec[0] = 0.0;
+        for ( cPow = maxCPow - 2; cPow < maxCPow; cPow += 0.2 ) {
 
+	        double meanAcc = 0, meanSens = 0, meanSpec = 0;
 
-            tempTrainBias = Math.pow(2, cPow);
+            trainBias = Math.pow( 2, cPow );
 
             System.out.print( String.format( "\t\tBIASPOW:2^%.2f", cPow ) ); long start = System.currentTimeMillis();
-            performCrossFoldValidationWithBias( splitCount, tempTrainBias, tempAcc, tempSens, tempSpec );
-            System.out.println(
-                    String.format(
-                            "/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d",
-                            tempAcc[0],tempSens[0],tempSpec[0], (System.currentTimeMillis()-start)/1000
-                    )
-            );
 
-            if (bestAcc < tempAcc[0]){
-                bestAcc = tempAcc[0];
-                bestTrainBias = tempTrainBias;
+	        double solvesCount = 0;
+	        for ( int k=0; k<3; k++ ) {
+		        boolean foldSolvedFlags[] = new boolean[splitCount];
+		        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
 
-                accuracy.setValue(tempAcc[0]);
-                sensitivity.setValue(tempSens[0]);
-                specificity.setValue(tempSpec[0]);
-            }
+		        performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+
+		        for ( int j=0; j<splitCount; j++ ) {
+
+			        if ( foldSolvedFlags[j] ) {
+				        solvesCount++;
+				        meanAcc  += foldAcc[j];
+				        meanSens += foldSens[j];
+				        meanSpec += foldSpec[j];
+			        }
+		        }
+	        }
+
+	        if ( solvesCount > 0 ) {
+		        meanAcc  /= solvesCount;
+		        meanSens /= solvesCount;
+		        meanSpec /= solvesCount;
+	        }
+
+	        System.out.printf(
+		        "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d\n",
+		        meanAcc, meanSens, meanSpec, ( System.currentTimeMillis() - start ) / 1000
+	        );
+
+	        if ( bestAcc < meanAcc ) {
+		        bestAcc = meanAcc;
+		        bestTrainBias = trainBias;
+
+		        accuracy.setValue( meanAcc );
+		        sensitivity.setValue( meanSens );
+		        specificity.setValue( meanSpec );
+	        }
         }
 
         return bestTrainBias;
@@ -442,7 +456,7 @@ public class PvmSolver {
                 tempParams.trainBias = searchPositiveTrainBias(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
 
 	            System.out.printf(
-		            "\tEVALUATED ->%s/ACC:%.03f/SENS:%.03f/SPEC:%.03f/TIME:%d\n",
+		            "\tEVALUATED ->%s/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d\n",
 		            tempParams,tempAccuracy.doubleValue(),tempSensitivity.doubleValue(),tempSpecificity.doubleValue(),(System.currentTimeMillis()-start)/1000
 	            );
 
@@ -459,17 +473,17 @@ public class PvmSolver {
         PvmTrainParameters tempParams = new PvmTrainParameters();
         int refinementLvl = 1;
         ArrayList<PvmTrainParameters> bestTrainParams = new ArrayList<PvmTrainParameters>();
-
+		long start;
 
         for (KernelProductManager.KerType kerType : kernelTypes){
-            //tempParams.kerType = KernelProductManager.KerType.KERRBF;
+            //tempParams.kerType = KernelProductManager.KerType.KERSCALAR;
             tempParams.kerType = kerType;
             KernelProductManager.setKernelTypeGlobal(tempParams.kerType);
             tempParams.paramInt = KernelProductManager.getPreferedCenterInt();
             tempParams.paramDouble = KernelProductManager.getPreferedCenterDouble();
 
 	        System.out.println( "EVALKERNEL: " + tempParams.kerType );
-	        long start = System.currentTimeMillis();
+	        start = System.currentTimeMillis();
 
 	        addLocalTrainParameters(splitCount, refinementLvl, tempParams, bestTrainParams);
 
@@ -477,7 +491,7 @@ public class PvmSolver {
         }
 
         Collections.sort(bestTrainParams, tempParams);
-        while (bestTrainParams.size() > maxBestPositions)
+        while (bestTrainParams.size() > MAX_BEST_POSITIONS )
             bestTrainParams.remove(bestTrainParams.size() - 1);
 
 	    System.out.println( "Found best train params: " );
@@ -489,13 +503,13 @@ public class PvmSolver {
         for (refinementLvl = 2; refinementLvl < 4; refinementLvl++){
             for (int i = bestTrainParams.size() - 1; i > 0; i--) {
 	            System.out.print( "EVAL/" + tempParams );
-	            long start = System.currentTimeMillis();
+	            start = System.currentTimeMillis();
                 addLocalTrainParameters(splitCount, refinementLvl, bestTrainParams.get(i), bestTrainParams);
 	            System.out.println( "/TIME:" + (System.currentTimeMillis()-start)*1000 );
             }
 
             Collections.sort(bestTrainParams, tempParams);
-            while (bestTrainParams.size() > maxBestPositions)
+            while (bestTrainParams.size() > MAX_BEST_POSITIONS )
                 bestTrainParams.remove(bestTrainParams.size() - 1);
         }
 
@@ -557,7 +571,9 @@ public class PvmSolver {
 
 			try {
 				solvedFlags[split] = true;
+
 				if ( !localSlv.TrainSingleLPWithBias( positiveBias ) ) {
+				//if ( !localSlv.TrainSingleLPWithBiasAndNoiseElimination( positiveBias ) ) {
 					solvedFlags[split] = false;
 					return;
 				}
@@ -577,37 +593,15 @@ public class PvmSolver {
 	    try { SolverHelper.dropNativeCplex(); } catch ( URISyntaxException ignored ) {}
 
 	    PvmSolver solver = new PvmSolver();
-        /*PvmTrainParameters bestTrainParams = new PvmTrainParameters();
+        PvmTrainParameters bestTrainParams = new PvmTrainParameters();
         MutableDouble acc = new MutableDouble(0), sens = new MutableDouble(0), spec = new MutableDouble(0);
 
-        KernelProductManager.KerType kerTypes[] = new KernelProductManager.KerType[1];
-
-        kerTypes[0] = KernelProductManager.KerType.KERSCALAR;
         solver.core.ReadFile( args[0] );
-        solver.searchTrainParameters(10, kerTypes, bestTrainParams, acc, sens, spec );*/
 
-        int i, pInt = 0;
-        double pDouble = 0.17677669529663667;
-        solver.core.ReadFile( args[0] );
-        KernelProductManager.setKernelTypeGlobal(KernelProductManager.KerType.KERRBF);
-        KernelProductManager.setParamInt(pInt);
-        KernelProductManager.setParamDouble(pDouble);
+		KernelProductManager.KerType[] kernelTypes = new KernelProductManager.KerType[2];
+		kernelTypes[0] = KernelProductManager.KerType.KERSCALAR;
+		kernelTypes[1] = KernelProductManager.KerType.KERRBF;
 
-        int runCount = 30;
-        double fAcc = 0, fSens = 0, fSpec = 0;
-        double tempAcc[] = new double[1];
-        double tempSens[] = new double[1];
-        double tempSpec[] = new double[1];
-
-        for (i = 0; i < runCount; i++){
-            solver.performCrossFoldValidationWithBias(10, 1.0, tempAcc, tempSens, tempSpec);
-            fAcc += tempAcc[0];
-            fSens += tempSens[0];
-            fSpec += tempSpec[0];
-        }
-
-        fAcc /= (double)runCount;
-        fSens /= (double)runCount;
-        fSpec /= (double)runCount;
+        solver.searchTrainParameters( 10, kernelTypes, bestTrainParams, acc, sens, spec );
     }
 }

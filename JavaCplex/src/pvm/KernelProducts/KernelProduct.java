@@ -8,7 +8,6 @@ import pvm.PvmEntry;
  * User: Andrei
  * Date: 1/4/13
  * Time: 6:46 PM
- * To change this template use File | Settings | File Templates.
  */
 public abstract class KernelProduct {
 

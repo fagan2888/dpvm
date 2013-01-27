@@ -4,8 +4,7 @@ import pvm.KernelProducts.KernelProductManager;
 import util.RandomUtils;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -518,7 +517,22 @@ public class PvmDataCore {
         return ret;
     }
 
-    public double[] getNormalizedSignedDistancesNeg(){
+	public List<Map.Entry<Double, Integer>> getNormalizedSignedDistancesWithIndexPos(){
+
+		List<Map.Entry<Double, Integer>> ret = new ArrayList<Map.Entry<Double, Integer>>( xPos.length );
+
+		for (int i = 0; i < xPos.length; i++) {
+			double distance = getNormalizedSignedDistance( entries.get( xPos[i] ) );
+			int    index = xPos[i];
+			Map.Entry<Double, Integer> entry = new AbstractMap.SimpleEntry<Double, Integer>( distance, index );
+			ret.add( entry );
+		}
+
+		return ret;
+	}
+
+
+	public double[] getNormalizedSignedDistancesNeg(){
         double ret[] = new double[xNeg.length];
 
         for (int i = 0; i < xNeg.length; i++)
@@ -526,6 +540,20 @@ public class PvmDataCore {
 
         return ret;
     }
+
+	public List<Map.Entry<Double, Integer>> getNormalizedSignedDistancesWithIndexNeg(){
+
+		List<Map.Entry<Double, Integer>> ret = new ArrayList<Map.Entry<Double, Integer>>( xNeg.length );
+
+		for (int i = 0; i < xNeg.length; i++) {
+			double distance = getNormalizedSignedDistance( entries.get( xNeg[i] ) );
+			int    index = xNeg[i];
+			Map.Entry<Double, Integer> entry = new AbstractMap.SimpleEntry<Double, Integer>( distance, index );
+			ret.add( entry );
+		}
+
+		return ret;
+	}
 
     public double getNormalizedSignedDistance(PvmEntry src){
         if (src.label){
