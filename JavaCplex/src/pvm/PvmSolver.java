@@ -33,7 +33,7 @@ public class PvmSolver {
 	    core = new PvmDataCore();
         pvmSys = new PvmSystem();
     }
-    public boolean Train(){
+    public boolean Train() throws IloException {
         double t_l = 0.0, t_r = 1.0, t_c;
         core.Init();
 

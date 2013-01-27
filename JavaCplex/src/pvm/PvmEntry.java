@@ -18,8 +18,9 @@ public class PvmEntry implements Comparable{
         int i;
         double [] nx = new double[nsize];
 
-        for (i = 0; i < x.length; i++)
-            nx[i] = x[i];
+        if (x != null)
+            for (i = 0; i < x.length; i++)
+                nx[i] = x[i];
 
         x = nx;
     }

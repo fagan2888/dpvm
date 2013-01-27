@@ -22,7 +22,7 @@ import java.util.List;
 
 public class PvmSystem {
     IloCplex cplex;//the cplex solver
-    IloNumVar [] vars;//the variables
+    IloNumVar[] vars;//the variables
     IloRange [] rngConstraints;//the constraints returned by the solver
 
     /*the two constraints that express:
@@ -37,7 +37,7 @@ public class PvmSystem {
 
     IterativeGlobalSolver globalSolver = null;
 
-    public boolean BuildSystemFor(PvmDataCore pvms, double t, boolean saveSys, boolean nameAllConstraints){
+    public boolean BuildSystemFor(PvmDataCore pvms, double t, boolean saveSys, boolean nameAllConstraints) throws IloException {
 
         try {
             addCplexSolver( false );
@@ -86,7 +86,6 @@ public class PvmSystem {
             vars[i].setName(GlobalModelBuilder.getVarNameByIndex(i));
     }
 
-
     private void SetConstraintsNames(){
         int i;
 
@@ -112,8 +111,7 @@ public class PvmSystem {
         return true;
     }
 
-    private boolean CreateVariables()
-    {
+    protected boolean CreateVariables() throws IloException {
         return CreateVariables(true, false, Double.MAX_VALUE);
     }
     private boolean CreateVariables(boolean addHyperplaneOffsetVar, boolean constrainedAlphas, double constrainedAlphasLimit){
@@ -155,7 +153,7 @@ public class PvmSystem {
 
     }
 
-    private boolean AddSigmaRegularConstraints(){
+    protected boolean AddSigmaRegularConstraints(){
         int i, rngIdx = 0;
 
         for (i = 0; i < core.xPos.length; i++, rngIdx += 2)
@@ -889,7 +887,7 @@ public class PvmSystem {
         cplex.addLe(sphereConstraint, 1.0);
     }
 
-    private void cleanCplex() throws IloException {
+    protected void cleanCplex() throws IloException {
         if (cplex != null)
         {
             cplex.clearModel();
@@ -905,7 +903,7 @@ public class PvmSystem {
 	    super.finalize();
     }
 
-    private void addCplexSolver( boolean verbalize ) throws IloException {
+    protected void addCplexSolver( boolean verbalize ) throws IloException {
         cleanCplex();
         cplex = new IloCplex();
 
