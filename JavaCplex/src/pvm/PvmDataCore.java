@@ -590,4 +590,34 @@ public class PvmDataCore {
         return getSignedDistance(src) < 0 ? false : true;
     }
 
+    protected void recomputeSigmas(){
+        int i, j;
+        double signedDist;
+
+        for (i = 0; i < entries.size(); i++){
+            signedDist = offsetB;
+
+            for (j = 0; j < entries.size(); j++)
+                signedDist += gramMtx[i][j];
+
+            if (entries.get(i).label)
+                signedDist -= ePos;
+            else
+                signedDist -= eNeg;
+
+            if (signedDist < 0) signedDist = -signedDist;
+
+            sigmas[i] = signedDist;
+        }
+    }
+
+    protected void recomputeAverages(){
+        int i;
+        ePos = eNeg = offsetB;
+        for (i = 0; i < alphas.length; i++){
+            ePos += alphas[i] * kpos[i];
+            eNeg += alphas[i] * kneg[i];
+        }
+    }
+
 }

@@ -153,7 +153,7 @@ public class PvmSystem {
 
     }
 
-    protected boolean AddSigmaRegularConstraints(){
+    protected boolean AddSigmaRegularConstraints() throws IloException {
         int i, rngIdx = 0;
 
         for (i = 0; i < core.xPos.length; i++, rngIdx += 2)
@@ -168,7 +168,7 @@ public class PvmSystem {
 
     }
 
-    private boolean AddConstraintsForIdxPos(int idx, int rngIdx){
+    protected boolean AddConstraintsForIdxPos(int idx, int rngIdx) throws IloException {
 
         int i;
         IloLinearNumExpr lin = null;
@@ -200,7 +200,7 @@ public class PvmSystem {
         return true;
     }
 
-    private boolean AddConstraintsForIdxNeg(int idx, int rngIdx){
+    protected boolean AddConstraintsForIdxNeg(int idx, int rngIdx) throws IloException {
         int i;
         IloLinearNumExpr lin = null;
 
@@ -639,7 +639,7 @@ public class PvmSystem {
         return ret;
     }
 
-    private void setDenominatorUnityEqualityConstraint(int rngIdx) throws IloException {
+    protected void setDenominatorUnityEqualityConstraint(int rngIdx) throws IloException {
         int i;
 
         IloLinearNumExpr lin;
@@ -653,7 +653,7 @@ public class PvmSystem {
         rngConstraints[rngIdx] = cplex.addEq(1.0, lin, "UnityEq");
     }
 
-    private void setSingleLPTypeObjectiveWithBias(double positiveBias) throws IloException {
+    protected void setSingleLPTypeObjectiveWithBias(double positiveBias) throws IloException {
         int i;
         IloLinearNumExpr lin;
         double posTerm = positiveBias * (core.xNeg.length - 1), negTerm = core.xPos.length - 1;
