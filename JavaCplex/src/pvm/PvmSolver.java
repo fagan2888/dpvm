@@ -264,14 +264,15 @@ public class PvmSolver {
 	    ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
 
 	    // spawn a thread pool and add each fold as a task
-        for ( int i = 0; i<splitCount; i++ ) {
+        //for ( int i = 0; i<splitCount; i++ ) {
+        for ( int i = 0; i < 1; i++ ) {
 
 	        accuracy[i]    = 0.0;
 	        sensitivity[i] = 0.0;
 	        specificity[i] = 0.0;
 	        solvedFlags[i] = false;
 
-	        SolverFoldRunnable foldRunnable = new SolverFoldRunnable( splitCores, i, positiveBias );
+	        SolverFoldRunnable foldRunnable = new SolverFoldRunnable( splitCores, i, positiveBias, this );
 	        foldRunnable.setResultVectors( accuracy, sensitivity, specificity, solvedFlags );
 
 	        executorService.submit( foldRunnable );
@@ -527,12 +528,17 @@ public class PvmSolver {
         KernelProductManager.setParamDouble(trainParameters.paramDouble);
     }
 
-	private static class SolverFoldRunnable implements Runnable {
+    protected PvmSolver instantiateLocalSolver(){
+        return new PvmSolver();
+    }
+
+	private class SolverFoldRunnable implements Runnable {
 
 		ArrayList<PvmDataCore> splitCores;
 
 		ArrayList<PvmDataCore> trainCores;
 		PvmDataCore testCore;
+        PvmSolver parent;
 
 		double accuracy[];
 		double sensitivity[];
@@ -542,11 +548,12 @@ public class PvmSolver {
 		double positiveBias = 0;
 		int    split = -1;
 
-		public SolverFoldRunnable( ArrayList<PvmDataCore> splitCores, int split, double positiveBias ) throws IloException {
+		public SolverFoldRunnable( ArrayList<PvmDataCore> splitCores, int split, double positiveBias, PvmSolver parent ) throws IloException {
 
 			this.splitCores = splitCores;
 			this.positiveBias = positiveBias;
 			this.split = split;
+            this.parent = parent;
 		}
 
 		public void setResultVectors( double accuracy[], double sensitivity[], double specificity[], boolean solvedFlags[] ) {
@@ -566,8 +573,8 @@ public class PvmSolver {
 			testCore = trainCores.get( split );
 			trainCores.remove( split );
 
-			PvmSolver localSlv = new PvmSolver();
-			localSlv.core = PvmDataCore.mergeCores( trainCores );
+            PvmSolver localSlv = parent.instantiateLocalSolver();
+			localSlv.core = testCore.mergeCores( trainCores );
 
 			try {
 				solvedFlags[split] = true;

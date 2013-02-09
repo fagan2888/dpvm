@@ -17,8 +17,6 @@ public class PvmClusterSystem extends PvmSystem{
         for (int i = 0; i < vars.length; i++)
             vars[i] = cplex.numVar(-Double.MAX_VALUE, Double.MAX_VALUE, IloNumVarType.Float);
 
-
-        rngConstraints = new IloRange[core.clustersCount * 2 + 1];
         return true;
     }
 
@@ -120,11 +118,11 @@ public class PvmClusterSystem extends PvmSystem{
 
         varIdx = core.clustersCount;
         for (i = 0; i < core.clustersPos.size(); i++, varIdx++)
-            lin.addTerm(posTerm, vars[varIdx]);
+            lin.addTerm(posTerm * core.clustersPos.get(i).length, vars[varIdx]);
 
         varIdx = core.clustersCount + core.clustersPos.size();
         for (i = 0; i < core.clustersNeg.size(); i++, varIdx++)
-            lin.addTerm(negTerm, vars[varIdx]);
+            lin.addTerm(negTerm * core.clustersNeg.get(i).length, vars[varIdx]);
 
         obj = cplex.addMinimize(lin);
     }

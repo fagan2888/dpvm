@@ -40,6 +40,18 @@ public class FoldRunner {
         return true;
     }
 
+    protected static PvmSolver getNonClusterSolver(String fileName) throws IOException {
+        PvmSolver solver = new PvmSolver();
+        solver.core.ReadFile(fileName);
+        return solver;
+    }
+
+    protected static PvmClusterSolver getClusterSolver(String fileName) throws IOException {
+        PvmClusterSolver solver = new PvmClusterSolver();
+        solver.core.ReadFile(fileName);
+        return solver;
+    }
+
 
     public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException, CloneNotSupportedException {
 
@@ -48,7 +60,6 @@ public class FoldRunner {
 
         try { SolverHelper.dropNativeCplex(); } catch ( URISyntaxException ignored ) {}
 
-        PvmSolver solver = new PvmSolver();
 
 	    int splitCount = 10;
 
@@ -59,7 +70,9 @@ public class FoldRunner {
         KernelProductManager.KerType kerType = KernelProductManager.getAvailableKernels()[Integer.valueOf(args[1])].getKerType();
 
         int i;
-        solver.core.ReadFile( args[0] );
+        //PvmSolver solver = getNonClusterSolver(args[0]);
+        PvmSolver solver = getClusterSolver(args[0]);
+
         KernelProductManager.setKernelTypeGlobal(kerType);
         KernelProductManager.setParamInt(paramInt);
         KernelProductManager.setParamDouble(paramDouble);

@@ -34,6 +34,30 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         clusterSigmasNeg = new double[clustersNeg.size()];
     }
 
+    public void ReadFile(String fileName) throws IOException{
+        allocClusters();
+        super.ReadFile(fileName);
+        Init(false);
+        buildDefaultClusters();
+    }
+
+    protected void buildDefaultClusters(){
+        clustersPos.clear();
+        clustersNeg.clear();
+
+        clustersPos.add(xPos.clone());
+        clustersNeg.add(xNeg.clone());
+
+        clustersTotal.clear();
+        clustersTotal.addAll(clustersPos);
+        clustersTotal.addAll(clustersNeg);
+
+        clustersCount = clustersTotal.size();
+
+        clusterSigmasPos = new double[1];
+        clusterSigmasNeg = new double[1];
+    }
+
     protected void buildClustersTotal(){
         clustersTotal.addAll(clustersPos);
         clustersTotal.addAll(clustersNeg);
@@ -153,19 +177,7 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
     }
 
     public PvmClusterDataCore(PvmClusterDataCore other){
-        entries = other.entries;
-        xPos = other.xPos;
-        xNeg = other.xNeg;
-        gramMtx = other.gramMtx;
-        kpos = other.kpos;
-        kneg = other.kneg;
-        alphas = other.alphas;
-        sigmas = other.sigmas;
-        offsetB = other.offsetB;
-        ePos = other.ePos;
-        eNeg = other.eNeg;
-        sigPos = other.sigPos;
-        sigNeg = other.sigNeg;
+        from(other);
 
         clustersPos = new ArrayList<int[]>(other.clustersPos.size());
         for (int []cluster : other.clustersPos)
@@ -186,30 +198,91 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         clusterSigNeg = other.clusterSigNeg;
     }
 
+    public PvmClusterDataCore(PvmDataCore other){
+        from(other);
+    }
+
+    public PvmClusterDataCore(){
+
+    }
+
+    @Override
+    public PvmDataCore mergeCores(ArrayList<PvmDataCore> srcCores){
+        PvmDataCore temp = super.mergeCores(srcCores);
+        return new PvmClusterDataCore(temp);
+    }
+
+    public void from(PvmDataCore other){
+        entries = other.entries;
+        xPos = other.xPos;
+        xNeg = other.xNeg;
+        gramMtx = other.gramMtx;
+        kpos = other.kpos;
+        kneg = other.kneg;
+        alphas = other.alphas;
+        sigmas = other.sigmas;
+        offsetB = other.offsetB;
+        ePos = other.ePos;
+        eNeg = other.eNeg;
+        sigPos = other.sigPos;
+        sigNeg = other.sigNeg;
+    }
+
     public Object clone() throws CloneNotSupportedException{
         return new PvmClusterDataCore(this);
     }
 
-    public double computeClusterRelativeInducedAberration(int clusterIdx){
-        int cluster[] = clustersTotal.get(clusterIdx);
-        int posIdx = clustersPos.indexOf(cluster);
+    public double computeClusterRelativeInducedAberration(int clusterIdx, boolean positiveLabel){
+        int cluster[];
         double sigmaSum = 0, sigmaCluster;
+
+        if (positiveLabel){
+            cluster = clustersPos.get(clusterIdx);
+            sigmaCluster = clusterSigmasPos[clusterIdx];
+        }
+        else{
+            cluster = clustersNeg.get(clusterIdx);
+            sigmaCluster = clusterSigmasNeg[clusterIdx];
+        }
 
         for (int i : cluster)
             sigmaSum += sigmas[i];
-
-        if (posIdx >= 0){
-            sigmaCluster = clusterSigmasPos[posIdx];
-        }
-        else{
-            posIdx = clustersNeg.indexOf(cluster);
-            sigmaCluster = clusterSigmasNeg[posIdx];
-        }
 
         if (sigmaSum < epsDouble)
             return 0;
 
         return 1.0 - (sigmaCluster / sigmaSum);
+    }
+
+    public boolean splitClustersWithAberrationOverThreshold(double thresh){
+        int i, originalClusterCount = clustersTotal.size();
+        double aberration;
+
+
+        for (i = clustersPos.size() - 1; i >= 0; i--){
+            aberration = computeClusterRelativeInducedAberration(i, true);
+            if (aberration > thresh)
+                splitCluster(i, true);
+        }
+
+        for (i = clustersNeg.size() - 1; i >= 0; i--){
+            aberration = computeClusterRelativeInducedAberration(i, false);
+            if (aberration > thresh)
+                splitCluster(i, false);
+        }
+
+        clustersTotal.clear();
+        clustersTotal.addAll(clustersPos);
+        clustersTotal.addAll(clustersNeg);
+        clustersCount = clustersTotal.size();
+
+        if (originalClusterCount != clustersTotal.size()){
+            clusterSigmasPos = new double[clustersPos.size()];
+            clusterSigmasNeg = new double[clustersNeg.size()];
+        }
+
+
+        return originalClusterCount != clustersTotal.size();
     }
 
     private void splitCluster(int clusterIdx, boolean positiveLabel){
@@ -259,5 +332,23 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
 
         clustersSrc.set(clusterIdx, clusterPos);
         clustersSrc.add(clusterNeg);
+    }
+
+    @Override
+    public ArrayList<PvmDataCore> splitRandomIntoSlices(int sliceCount){
+        ArrayList<PvmDataCore> temp = super.splitRandomIntoSlices(sliceCount);
+        ArrayList<PvmDataCore> ret = new ArrayList<PvmDataCore>(temp.size());
+
+        for (PvmDataCore simpleCore : temp)
+            ret.add(new PvmClusterDataCore(simpleCore));
+
+        return ret;
+    }
+
+    @Override
+    public void Init(){
+        super.Init();
+        allocClusters();
+        buildDefaultClusters();
     }
 }

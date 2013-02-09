@@ -488,7 +488,7 @@ public class PvmDataCore {
         return resCores;
     }
 
-    public static PvmDataCore mergeCores(ArrayList<PvmDataCore> srcCores){
+    public PvmDataCore mergeCores(ArrayList<PvmDataCore> srcCores){
         //to do : merge all the cores into a single resulting core
         int i, entriesCount = 0;
         PvmDataCore resCore;
@@ -618,9 +618,10 @@ public class PvmDataCore {
     }
 
     public double computeSignedDistanceForIndexedEntry(int idx){
+        int i;
         double res = offsetB;
-        for (double kij : gramMtx[idx])
-            res += kij;
+        for (i = 0; i < alphas.length; i++)
+            res += alphas[i] * gramMtx[idx][i];
 
         return res;
     }
