@@ -595,10 +595,7 @@ public class PvmDataCore {
         double signedDist;
 
         for (i = 0; i < entries.size(); i++){
-            signedDist = offsetB;
-
-            for (j = 0; j < entries.size(); j++)
-                signedDist += gramMtx[i][j];
+            signedDist = computeSignedDistanceForIndexedEntry(i);
 
             if (entries.get(i).label)
                 signedDist -= ePos;
@@ -618,6 +615,14 @@ public class PvmDataCore {
             ePos += alphas[i] * kpos[i];
             eNeg += alphas[i] * kneg[i];
         }
+    }
+
+    public double computeSignedDistanceForIndexedEntry(int idx){
+        double res = offsetB;
+        for (double kij : gramMtx[idx])
+            res += kij;
+
+        return res;
     }
 
 }

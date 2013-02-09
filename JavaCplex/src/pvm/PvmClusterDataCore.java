@@ -211,4 +211,53 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
 
         return 1.0 - (sigmaCluster / sigmaSum);
     }
+
+    private void splitCluster(int clusterIdx, boolean positiveLabel){
+        int i, movedCount = 0;
+        int cluster[];
+        boolean moved[];
+        double avgSide, usedAvg;
+        ArrayList<int[]> clustersSrc;
+
+        if (positiveLabel){
+            clustersSrc = clustersPos;
+            usedAvg = ePos;
+        }
+        else{
+            clustersSrc = clustersNeg;
+            usedAvg = eNeg;
+        }
+
+        cluster = clustersSrc.get(clusterIdx);
+        moved = new boolean[cluster.length];
+
+        for (i = 0; i < cluster.length; i++){
+            avgSide = computeSignedDistanceForIndexedEntry(cluster[i]);
+            avgSide -= usedAvg;
+
+            if (avgSide >= 0)
+                moved[i] = false;
+            else{
+                movedCount++;
+                moved[i] = true;
+            }
+        }
+
+        int clusterPos[] = new int[cluster.length - movedCount], posIdx = 0;
+        int clusterNeg[] = new int[movedCount], negIdx = 0;
+
+        for (i = 0; i < cluster.length; i++){
+            if (moved[i]){
+                clusterNeg[negIdx] = cluster[i];
+                negIdx++;
+            }
+            else {
+                clusterPos[posIdx] = cluster[i];
+                posIdx++;
+            }
+        }
+
+        clustersSrc.set(clusterIdx, clusterPos);
+        clustersSrc.add(clusterNeg);
+    }
 }
