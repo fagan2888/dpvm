@@ -693,7 +693,7 @@ public class PvmSystem {
             rngConstraints[rngIdx] = cplex.addEq(posTerm * negTerm, lin, "UnityEq");
     }
 
-    private void setSingleLPTypeObjectiveInverse() throws IloException{
+    private void setSingleLPTypeObjectiveInverse(double positiveTrainBias) throws IloException{
         int i;
 
         IloLinearNumExpr lin;
@@ -701,7 +701,7 @@ public class PvmSystem {
         lin = cplex.linearNumExpr();
 
         for (i = 0; i < baseCount; i++)
-            lin.addTerm(core.kpos[i] - core.kneg[i], vars[i]);
+            lin.addTerm((core.kpos[i] / positiveTrainBias) - core.kneg[i], vars[i]);
 
         obj = cplex.addMaximize(lin);
     }
@@ -861,6 +861,10 @@ public class PvmSystem {
     }
 
     public boolean buildSecondaryLpSystem (PvmDataCore pvms) throws IloException {
+        return buildSecondaryLpSystem(pvms, 1.0);
+    }
+
+    public boolean buildSecondaryLpSystem (PvmDataCore pvms, double positiveTrainBias) throws IloException {
 
         addCplexSolver( false );
 
@@ -872,7 +876,7 @@ public class PvmSystem {
         CreateSecondaryConstrainedVariables(1.0);
         AddSigmaVoidConstraints();
         addUnitSphereConstraint();
-        setSingleLPTypeObjectiveInverse();
+        setSingleLPTypeObjectiveInverse(positiveTrainBias);
 
         return true;
     }

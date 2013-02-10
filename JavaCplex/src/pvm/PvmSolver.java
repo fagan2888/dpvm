@@ -264,8 +264,8 @@ public class PvmSolver {
 	    ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
 
 	    // spawn a thread pool and add each fold as a task
-        //for ( int i = 0; i<splitCount; i++ ) {
-        for ( int i = 0; i < 1; i++ ) {
+        for ( int i = 0; i<splitCount; i++ ) {
+        //for ( int i = 0; i < 1; i++ ) {
 
 	        accuracy[i]    = 0.0;
 	        sensitivity[i] = 0.0;

@@ -176,6 +176,56 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         return resT;
     }
 
+    public double computeClusteredObjectiveValue(double positiveTrainBias){
+        int i;
+        double clusterSigDist, resT;
+
+        clusterSigPos = 0;
+        for (i = 0; i < clustersPos.size(); i++){
+            clusterSigDist = 0;
+            for (int eIdx : clustersPos.get(i))
+                clusterSigDist += computeSignedDistanceForIndexedEntry(eIdx);
+
+            clusterSigDist -= ePos * clustersPos.get(i).length;
+
+            if (clusterSigDist < 0)
+                clusterSigDist = -clusterSigDist;
+
+            clusterSigPos += clusterSigDist;
+        }
+        clusterSigPos /= (double)(xPos.length - 1);
+
+        clusterSigNeg = 0;
+        for (i = 0; i < clustersNeg.size(); i++){
+            clusterSigDist = 0;
+            for (int eIdx : clustersNeg.get(i))
+                clusterSigDist += computeSignedDistanceForIndexedEntry(eIdx);
+
+            clusterSigDist -= eNeg * clustersNeg.get(i).length;
+
+            if (clusterSigDist < 0)
+                clusterSigDist = -clusterSigDist;
+
+            clusterSigNeg += clusterSigDist;
+        }
+        clusterSigNeg /= (double)(xNeg.length - 1);
+
+        if (ePos < 1e-10 && eNeg > -1e-10)
+            return 0;
+
+        resT = 0.0;
+
+        if (ePos >= 1e-10)
+            resT = positiveTrainBias * clusterSigPos / ePos;
+
+        if (eNeg <= -1e-10){
+            if (resT < - clusterSigNeg / eNeg)
+                resT = - clusterSigNeg / eNeg;
+        }
+
+        return resT;
+    }
+
     public PvmClusterDataCore(PvmClusterDataCore other){
         from(other);
 

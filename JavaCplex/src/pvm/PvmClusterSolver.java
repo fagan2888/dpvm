@@ -18,9 +18,12 @@ import java.util.ArrayList;
 public class PvmClusterSolver extends PvmSolver{
     PvmClusterDataCore clusterCore;
     PvmClusterSystem pvmClusterSys;
-    public static double relativeObjectiveThresh = 0.97;
+    public static double relativeObjectiveThresh = 0.9999;
+    public static double objectiveMinimalDifference = 1.5e-15;
     public static double relativeAberrationInitialThresh = 0.95;
-    public static double relativeAberrationThreshDecayRate = 0.05;
+    public static double relativeAberrationThreshDecayRate = 0.85;
+    public static double relativeAberrationMinimalThresh = 0.01;
+
 
     public PvmClusterSolver(){
         core = clusterCore = new PvmClusterDataCore();
@@ -45,17 +48,20 @@ public class PvmClusterSolver extends PvmSolver{
                 return false;
 
             nonClusteredObjective = clusterCore.computeNonClusteredObjectiveValue(positiveBias);
-            clusterObjective = resT[0];
+            clusterObjective = clusterCore.computeClusteredObjectiveValue(positiveBias);
 
-            relativeObjective = 1.0;
-            if (nonClusteredObjective > 0)
-                relativeObjective = clusterObjective / nonClusteredObjective;
+            //objectiveMinimalDifference
+            if (clusterObjective + objectiveMinimalDifference < nonClusteredObjective * relativeObjectiveThresh){
+                while (!clusterCore.splitClustersWithAberrationOverThreshold(splitAberrationThresh) &&
+                        splitAberrationThresh > relativeAberrationMinimalThresh)
+                    splitAberrationThresh *= relativeAberrationThreshDecayRate;
 
-            if (relativeObjective < relativeObjectiveThresh && splitAberrationThresh > 1e-10){
-                while (!clusterCore.splitClustersWithAberrationOverThreshold(splitAberrationThresh))
+                if (splitAberrationThresh <= relativeAberrationMinimalThresh)
                     splitAberrationThresh *= relativeAberrationThreshDecayRate;
             }
-        } while (relativeObjective < relativeObjectiveThresh);
+            else
+                break;
+        } while (true);
 
         return true;
     }

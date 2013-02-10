@@ -127,11 +127,16 @@ public class PvmClusterSystem extends PvmSystem{
         obj = cplex.addMinimize(lin);
     }
 
-    public boolean buildSingleLPSystemWithBias(PvmClusterDataCore pvmClusterDataCore, double bias) throws IloException{
+    @Override
+    public boolean buildSingleLPSystemWithBias(PvmDataCore pvmClusterDataCore, double bias) throws IloException{
+
+        if (pvmClusterDataCore.getClass() == PvmDataCore.class)//should never happen here!!
+            return super.buildSingleLPSystemWithBias(pvmClusterDataCore, bias);
+
         super.cleanCplex();
         super.addCplexSolver(false);
 
-        core = pvmClusterDataCore;
+        core = (PvmClusterDataCore)pvmClusterDataCore;
         baseCount = core.entries.size();
 
         rngConstraints = new IloRange[core.clustersCount * 2 + 1];

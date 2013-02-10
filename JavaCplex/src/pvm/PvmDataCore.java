@@ -422,7 +422,7 @@ public class PvmDataCore {
 
         if (sigPos < epsDouble && sigNeg < epsDouble)
         {
-            offsetB = -(ksumPos + ksumNeg) / (1 + positiveTrainBias);
+            offsetB = -(ksumPos + positiveTrainBias * ksumNeg) / (1 + positiveTrainBias);
             resT[0] = 0.0;
         }
         else
