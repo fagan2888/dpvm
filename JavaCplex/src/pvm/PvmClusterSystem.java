@@ -20,6 +20,14 @@ public class PvmClusterSystem extends PvmSystem{
         return true;
     }
 
+    protected boolean CreateSecondaryVariables() throws IloException {
+        vars = new IloNumVar[core.clustersCount];
+        for (int i = 0; i < vars.length; i++)
+            vars[i] = cplex.numVar(-Double.MAX_VALUE, Double.MAX_VALUE, IloNumVarType.Float);
+
+        return true;
+    }
+
     @Override
     protected boolean AddSigmaRegularConstraints() throws IloException {
         int i, idx = 0;
@@ -169,6 +177,100 @@ public class PvmClusterSystem extends PvmSystem{
 
         for (i = 0; i < core.clustersNeg.size(); i++)
             core.clusterSigmasNeg[i] = x[core.clustersCount + core.clustersPos.size() + i];
+
+        core.recomputeHyperplaneBias( resT, positiveTrainBias );
+
+        return true;
+    }
+
+    @Override
+    public boolean buildSecondaryLpSystem (PvmDataCore pvms, double positiveTrainBias) throws IloException {
+        if (pvms.getClass() == PvmDataCore.class)
+            return super.buildSecondaryLpSystem(pvms, positiveTrainBias);
+
+        super.cleanCplex();
+        super.addCplexSolver(false);
+
+        core = (PvmClusterDataCore)pvms;
+        baseCount = core.entries.size();
+
+        rngConstraints = new IloRange[core.clustersCount * 2 + 1];
+        CreateSecondaryVariables();
+        AddSigmaVoidConstraints();
+        addUnitSphereConstraint();
+        setSingleLPTypeObjectiveInverse(positiveTrainBias);
+
+        return true;
+    }
+
+    @Override
+    protected void AddSigmaVoidConstraints() throws IloException {
+        int i, idx = 0;
+
+        for (i = 0; i < core.clustersPos.size(); i++, idx+=2)
+            AddSigmaVoidConstraintsForIdxPos(i, idx);
+
+        for (i = 0; i < core.clustersNeg.size(); i++, idx+=2)
+            AddSigmaVoidConstraintsForIdxNeg(i, idx);
+    }
+
+    protected void AddSigmaVoidConstraintsForIdxPos(int clusterIdx, int rngIdx) throws IloException {
+        int cluster[] = core.clustersPos.get(clusterIdx);
+        IloLinearNumExpr lin;
+
+        lin = cplex.linearNumExpr();
+        setLinearAbsoluteValueInequalityTerms(lin, cluster, true);
+        rngConstraints[rngIdx] = cplex.addEq(lin, 0.0);
+    }
+
+    protected void AddSigmaVoidConstraintsForIdxNeg(int clusterIdx, int rngIdx) throws IloException {
+        int cluster[] = core.clustersPos.get(clusterIdx);
+        IloLinearNumExpr lin;
+
+        lin = cplex.linearNumExpr();
+        setLinearAbsoluteValueInequalityTerms(lin, cluster, false);
+        rngConstraints[rngIdx] = cplex.addEq(lin, 0.0);
+    }
+
+    @Override
+    protected void setSingleLPTypeObjectiveInverse(double positiveTrainBias) throws IloException{
+        int i;
+        IloLinearNumExpr lin;
+        double term;
+
+        lin = cplex.linearNumExpr();
+
+        for (i = 0; i < core.clustersCount; i++){
+            term = 0;
+            for (int eIdx : core.clustersTotal.get(i))
+                term += (core.kpos[eIdx] / positiveTrainBias) - core.kneg[eIdx];
+
+            lin.addTerm(term, vars[i]);
+        }
+
+        obj = cplex.addMaximize(lin);
+    }
+
+    @Override
+    public boolean solveSingleLPSecondary(double [] resT, double positiveTrainBias) throws IloException {
+        int i, sigIdx;
+
+        if (!cplex.solve())
+            return false;
+
+        assert (resT.length > 0);
+
+        double [] x = cplex.getValues(vars);
+
+        for (i = 0; i < core.clustersCount; i++)
+            for (int eIdx : core.clustersTotal.get(i))
+                core.alphas[eIdx] = x[i];
+
+        for (i = 0; i < core.clusterSigmasPos.length; i++)
+            core.clusterSigmasPos[i] = 0;
+
+        for (i = 0; i < core.clusterSigmasNeg.length; i++)
+            core.clusterSigmasNeg[i] = 0;
 
         core.recomputeHyperplaneBias( resT, positiveTrainBias );
 

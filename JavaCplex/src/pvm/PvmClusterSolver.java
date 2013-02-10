@@ -35,6 +35,7 @@ public class PvmClusterSolver extends PvmSolver{
         double splitAberrationThresh = relativeAberrationInitialThresh;
         double relativeObjective;
         double clusterObjective, nonClusteredObjective;
+        double [] resT = new double[1];
 
         if (core.getClass() == PvmClusterDataCore.class)
             clusterCore = (PvmClusterDataCore)core;
@@ -42,7 +43,6 @@ public class PvmClusterSolver extends PvmSolver{
         clusterCore.Init();
 
         do{
-            double [] resT = new double[1];
             pvmClusterSys.buildSingleLPSystemWithBias(clusterCore, positiveBias);
             if (!pvmClusterSys.solveSingleLPWithBias(resT, positiveBias))
                 return false;
@@ -62,6 +62,15 @@ public class PvmClusterSolver extends PvmSolver{
             else
                 break;
         } while (true);
+
+        if (resT[0] == 0){
+            pvmClusterSys.buildSecondaryLpSystem(clusterCore, positiveBias);
+            if (!pvmClusterSys.solveSingleLPSecondary(resT, positiveBias))
+                return false;
+
+            nonClusteredObjective = clusterCore.computeNonClusteredObjectiveValue(positiveBias);
+            clusterObjective = clusterCore.computeClusteredObjectiveValue(positiveBias);
+        }
 
         return true;
     }

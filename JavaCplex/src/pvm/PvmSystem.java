@@ -693,7 +693,7 @@ public class PvmSystem {
             rngConstraints[rngIdx] = cplex.addEq(posTerm * negTerm, lin, "UnityEq");
     }
 
-    private void setSingleLPTypeObjectiveInverse(double positiveTrainBias) throws IloException{
+    protected void setSingleLPTypeObjectiveInverse(double positiveTrainBias) throws IloException{
         int i;
 
         IloLinearNumExpr lin;
@@ -825,7 +825,7 @@ public class PvmSystem {
             vars[i] = cplex.numVar(-constrainedAlphasLimit, constrainedAlphasLimit, IloNumVarType.Float);
     }
 
-    private void AddSigmaVoidConstraints() throws IloException {
+    protected void AddSigmaVoidConstraints() throws IloException {
         int i, rngIdx = 0;
 
         for (i = 0; i < core.xPos.length; i++, rngIdx++)
@@ -885,7 +885,7 @@ public class PvmSystem {
 
         IloLQNumExpr sphereConstraint = cplex.lqNumExpr();
 
-        for (int i = 0; i < baseCount; i++)
+        for (int i = 0; i < vars.length; i++)
             sphereConstraint.addTerm(1.0, vars[i], vars[i]);
 
         cplex.addLe(sphereConstraint, 1.0);
