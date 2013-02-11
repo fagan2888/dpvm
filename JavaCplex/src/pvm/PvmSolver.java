@@ -261,10 +261,11 @@ public class PvmSolver {
         assert( splitCount == splitCores.size() );
         assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
-	    ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
+	    //ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
+        ExecutorService executorService = Executors.newFixedThreadPool( 1 );
 
 	    // spawn a thread pool and add each fold as a task
-        for ( int i = 0; i<splitCount; i++ ) {
+        for ( int i = 0; i < splitCount; i++ ) {
         //for ( int i = 0; i < 1; i++ ) {
 
 	        accuracy[i]    = 0.0;

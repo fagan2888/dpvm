@@ -171,7 +171,7 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         if (ePos > 0)
             resT = positiveTrainBias * sigPos / ePos;
         else if (eNeg < 0)
-            resT = -eNeg / eNeg;
+            resT = - sigNeg / eNeg;
 
         return resT;
     }
@@ -282,27 +282,93 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         return new PvmClusterDataCore(this);
     }
 
-    public double computeClusterRelativeInducedAberration(int clusterIdx, boolean positiveLabel){
+    protected double computeClusterSigmaSum(int clusterIdx, boolean positiveLabel){
+        double sigmaSum = 0;
         int cluster[];
-        double sigmaSum = 0, sigmaCluster;
 
-        if (positiveLabel){
+        if (positiveLabel)
             cluster = clustersPos.get(clusterIdx);
-            sigmaCluster = clusterSigmasPos[clusterIdx];
-        }
-        else{
+        else
             cluster = clustersNeg.get(clusterIdx);
-            sigmaCluster = clusterSigmasNeg[clusterIdx];
-        }
 
         for (int i : cluster)
             sigmaSum += sigmas[i];
 
-        if (sigmaSum < epsDouble)
-            return 0;
-
-        return 1.0 - (sigmaCluster / sigmaSum);
+        return sigmaSum;
     }
+
+    protected double getClusterSigma(int clusterIdx, boolean positiveLabel){
+        if (positiveLabel)
+            return clusterSigmasPos[clusterIdx];
+        return clusterSigmasNeg[clusterIdx];
+    }
+
+    public double computeClusterRelativeInducedAberration(int clusterIdx, boolean positiveLabel){
+        double sigmaSum = computeClusterSigmaSum(clusterIdx, positiveLabel);
+        double sigmaCluster = getClusterSigma(clusterIdx, positiveLabel);
+
+        if (sigmaSum > 1e-12)
+            return 1.0 - (sigmaCluster / sigmaSum);
+        else
+            return 0.0;
+    }
+
+    public double computeClusterAbsoluteInducedAberration(int clusterIdx, boolean positiveLabel){
+        double sigmaSum = computeClusterSigmaSum(clusterIdx, positiveLabel);
+        double sigmaCluster = getClusterSigma(clusterIdx, positiveLabel);
+
+        return sigmaSum - sigmaCluster;
+    }
+
+    public boolean splitClustersDescendingAccordingToAberration(double percentOfMaximaSplitThresh){
+        boolean splitLeastOne = false;
+        int i, originalClusterCount = clustersTotal.size();
+        double aberrationsPos[], aberrationsNeg[], thresh = 0;
+
+        aberrationsPos = new double[clustersPos.size()];
+        aberrationsNeg = new double[clustersNeg.size()];
+
+        for (i = 0; i < aberrationsPos.length; i++){
+            aberrationsPos[i] = computeClusterAbsoluteInducedAberration(i, true);
+            if (thresh < aberrationsPos[i])
+                thresh = aberrationsPos[i];
+        }
+
+        for (i = 0; i < aberrationsNeg.length; i++){
+            aberrationsNeg[i] = computeClusterAbsoluteInducedAberration(i, false);
+            if (thresh < aberrationsNeg[i])
+                thresh = aberrationsNeg[i];
+        }
+
+        thresh *= percentOfMaximaSplitThresh;
+        if (thresh < 1e-10)
+            thresh = 1e-10;
+
+        for (i = 0; i < aberrationsPos.length; i++)
+            if (aberrationsPos[i] >= thresh){
+                splitLeastOne = true;
+                splitCluster(i, true);
+            }
+
+        for (i = 0; i < aberrationsNeg.length; i++)
+            if (aberrationsNeg[i] >= thresh){
+                splitLeastOne = true;
+                splitCluster(i, false);
+            }
+
+        clustersTotal.clear();
+        clustersTotal.addAll(clustersPos);
+        clustersTotal.addAll(clustersNeg);
+        clustersCount = clustersTotal.size();
+
+        if (originalClusterCount != clustersTotal.size()){
+            clusterSigmasPos = new double[clustersPos.size()];
+            clusterSigmasNeg = new double[clustersNeg.size()];
+        }
+
+        return splitLeastOne;
+    }
+
 
     public boolean splitClustersWithAberrationOverThreshold(double thresh){
         int i, originalClusterCount = clustersTotal.size();
@@ -365,6 +431,9 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
                 moved[i] = true;
             }
         }
+
+        if (movedCount == 0 || movedCount == cluster.length)
+            return;
 
         int clusterPos[] = new int[cluster.length - movedCount], posIdx = 0;
         int clusterNeg[] = new int[movedCount], negIdx = 0;

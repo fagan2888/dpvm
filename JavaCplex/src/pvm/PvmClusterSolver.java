@@ -47,13 +47,15 @@ public class PvmClusterSolver extends PvmSolver{
             if (!pvmClusterSys.solveSingleLPWithBias(resT, positiveBias))
                 return false;
 
+            clusterCore.recomputeAverages();
+            clusterCore.recomputeSigmas();
             nonClusteredObjective = clusterCore.computeNonClusteredObjectiveValue(positiveBias);
             clusterObjective = clusterCore.computeClusteredObjectiveValue(positiveBias);
 
-            //objectiveMinimalDifference
             if (clusterObjective + objectiveMinimalDifference < nonClusteredObjective * relativeObjectiveThresh){
-                while (!clusterCore.splitClustersWithAberrationOverThreshold(splitAberrationThresh) &&
-                        splitAberrationThresh > relativeAberrationMinimalThresh)
+                while (!clusterCore.splitClustersDescendingAccordingToAberration(splitAberrationThresh))
+                /*while (!clusterCore.splitClustersWithAberrationOverThreshold(splitAberrationThresh) &&
+                        splitAberrationThresh > relativeAberrationMinimalThresh)*/
                     splitAberrationThresh *= relativeAberrationThreshDecayRate;
 
                 if (splitAberrationThresh <= relativeAberrationMinimalThresh)
@@ -64,6 +66,7 @@ public class PvmClusterSolver extends PvmSolver{
         } while (true);
 
         if (resT[0] == 0){
+
             pvmClusterSys.buildSecondaryLpSystem(clusterCore, positiveBias);
             if (!pvmClusterSys.solveSingleLPSecondary(resT, positiveBias))
                 return false;

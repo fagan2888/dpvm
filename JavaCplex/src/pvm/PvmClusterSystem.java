@@ -224,7 +224,7 @@ public class PvmClusterSystem extends PvmSystem{
     }
 
     protected void AddSigmaVoidConstraintsForIdxNeg(int clusterIdx, int rngIdx) throws IloException {
-        int cluster[] = core.clustersPos.get(clusterIdx);
+        int cluster[] = core.clustersNeg.get(clusterIdx);
         IloLinearNumExpr lin;
 
         lin = cplex.linearNumExpr();
