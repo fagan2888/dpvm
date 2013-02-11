@@ -136,7 +136,7 @@ public class PvmSolver {
 	    // the case where stdev is 0
         if (ret && resT[0] == 0.0)
         {
-            pvmSys.buildSecondaryLpSystem(core);
+            pvmSys.buildSecondaryLpSystem(core, positiveBias);
             ret = pvmSys.solveSingleLPSecondary(resT, positiveBias);
         }
 
