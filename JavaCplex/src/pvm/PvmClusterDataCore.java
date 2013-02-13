@@ -86,9 +86,17 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         return cCount;
     }
 
-    private void buildKMeansClustersForEntries(ArrayList<PvmEntry> entriesSrc, int cCount, ArrayList<int[]> dest){
-        //todo
-        //WekaSimpleKMeans.clusterElements(entries, clustersCount);
+    private void buildKMeansClustersForEntries(ArrayList<PvmEntry> entriesSrc, int cCount, ArrayList<int[]> dest) throws Exception {
+        ArrayList<ArrayList<PvmEntry>> retClusters = WekaSimpleKMeans.clusterElements(entriesSrc, cCount);
+        int i, j;
+
+        dest.clear();
+        for (i = 0; i < retClusters.size(); i++){
+            int idxs[] = new int[retClusters.get(i).size()];
+
+            for (j = 0; j < idxs.length; j++)
+                idxs[j] = entries.indexOf(retClusters.get(i).get(j));
+        }
     }
 
     protected void buildClustersTotal(){
