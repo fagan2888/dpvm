@@ -58,9 +58,47 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         clusterSigmasNeg = new double[1];
     }
 
+    protected void buildKMeansClusters(double clustersRatio) throws Exception {
+        ArrayList<PvmEntry> tempEntries = new ArrayList<PvmEntry>(xPos.length);
+        int cCount;
+
+        cCount = getEntriesListAndClustersCount(tempEntries, xPos, clustersRatio);
+        clustersPos = new ArrayList<int[]>(cCount);
+        buildKMeansClustersForEntries(tempEntries, cCount, clustersPos);
+
+        cCount = getEntriesListAndClustersCount(tempEntries, xNeg, clustersRatio);
+        clustersNeg = new ArrayList<int[]>(cCount);
+        buildKMeansClustersForEntries(tempEntries, cCount, clustersPos);
+
+        buildClustersTotal();
+    }
+
+    private int getEntriesListAndClustersCount(ArrayList<PvmEntry> destEntries, int [] srcIdxs, double clustersRatio){
+        destEntries.clear();
+        for (int idx : srcIdxs)
+            destEntries.add(entries.get(idx));
+
+        int cCount = (int)(xPos.length * clustersRatio + 0.5);
+
+        if (cCount < 2)
+            cCount = 2;
+
+        return cCount;
+    }
+
+    private void buildKMeansClustersForEntries(ArrayList<PvmEntry> entriesSrc, int cCount, ArrayList<int[]> dest){
+        //todo
+        //WekaSimpleKMeans.clusterElements(entries, clustersCount);
+    }
+
     protected void buildClustersTotal(){
+        if (clustersTotal == null)
+            clustersTotal = new ArrayList<int[]>(clustersPos.size() + clustersNeg.size());
+
+        clustersTotal.clear();
         clustersTotal.addAll(clustersPos);
         clustersTotal.addAll(clustersNeg);
+        clustersCount = clustersTotal.size();
     }
 
     protected int getSingleClusterPositiveLabelCount(int cluster[]){
