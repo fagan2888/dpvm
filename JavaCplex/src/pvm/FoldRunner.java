@@ -46,14 +46,16 @@ public class FoldRunner {
         return solver;
     }
 
-    protected static PvmClusterSolver getClusterSolver(String fileName) throws IOException {
+    protected static PvmClusterSolver getClusterSolver(String fileName) throws Exception {
         PvmClusterSolver solver = new PvmClusterSolver();
         solver.core.ReadFile(fileName);
+        solver.clusterCore.buildKMeansClusters(0.35);
+        //solver.clusterCore.buildIndividualClustersForEachElement();
         return solver;
     }
 
 
-    public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException, CloneNotSupportedException {
+    public static void main(String[] args ) throws Exception, LocalSolver.LocalSolverInputException {
 
         if (!checkMainArgs(args))
             return;
@@ -72,6 +74,7 @@ public class FoldRunner {
         int i;
         //PvmSolver solver = getNonClusterSolver(args[0]);
         PvmSolver solver = getClusterSolver(args[0]);
+
 
         KernelProductManager.setKernelTypeGlobal(kerType);
         KernelProductManager.setParamInt(paramInt);

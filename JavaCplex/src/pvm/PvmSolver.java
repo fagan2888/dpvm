@@ -254,15 +254,15 @@ public class PvmSolver {
     }
 
     public void performCrossFoldValidationWithBias(int splitCount, double positiveBias, boolean solvedFlags[], double accuracy[], double sensitivity[], double specificity[]) throws IloException {
-
 	    core.Init( false );
         ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices( splitCount );
 
         assert( splitCount == splitCores.size() );
         assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
-	    //ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
-        ExecutorService executorService = Executors.newFixedThreadPool( 1 );
+        //todo : replace with the actual multithreaded version from the final version
+	    ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
+        //ExecutorService executorService = Executors.newFixedThreadPool( 1 );
 
 	    // spawn a thread pool and add each fold as a task
         for ( int i = 0; i < splitCount; i++ ) {
@@ -273,7 +273,7 @@ public class PvmSolver {
 	        specificity[i] = 0.0;
 	        solvedFlags[i] = false;
 
-	        SolverFoldRunnable foldRunnable = new SolverFoldRunnable( splitCores, i, positiveBias, this );
+	        SolverFoldRunnable foldRunnable = new SolverFoldRunnable( splitCores, core, i, positiveBias, this );
 	        foldRunnable.setResultVectors( accuracy, sensitivity, specificity, solvedFlags );
 
 	        executorService.submit( foldRunnable );
@@ -536,8 +536,8 @@ public class PvmSolver {
 	private class SolverFoldRunnable implements Runnable {
 
 		ArrayList<PvmDataCore> splitCores;
-
 		ArrayList<PvmDataCore> trainCores;
+        PvmDataCore splitCoreSource;
 		PvmDataCore testCore;
         PvmSolver parent;
 
@@ -549,8 +549,8 @@ public class PvmSolver {
 		double positiveBias = 0;
 		int    split = -1;
 
-		public SolverFoldRunnable( ArrayList<PvmDataCore> splitCores, int split, double positiveBias, PvmSolver parent ) throws IloException {
-
+		public SolverFoldRunnable( ArrayList<PvmDataCore> splitCores, PvmDataCore splitCoreSource, int split, double positiveBias, PvmSolver parent ) throws IloException {
+            this.splitCoreSource = splitCoreSource;
 			this.splitCores = splitCores;
 			this.positiveBias = positiveBias;
 			this.split = split;
@@ -575,7 +575,7 @@ public class PvmSolver {
 			trainCores.remove( split );
 
             PvmSolver localSlv = parent.instantiateLocalSolver();
-			localSlv.core = testCore.mergeCores( trainCores );
+			localSlv.core = splitCoreSource.mergeCores( trainCores );
 
 			try {
 				solvedFlags[split] = true;

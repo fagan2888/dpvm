@@ -40,7 +40,7 @@ public class PvmClusterSolver extends PvmSolver{
         if (core.getClass() == PvmClusterDataCore.class)
             clusterCore = (PvmClusterDataCore)core;
 
-        clusterCore.Init();
+        //clusterCore.Init();
 
         do{
             pvmClusterSys.buildSingleLPSystemWithBias(clusterCore, positiveBias);

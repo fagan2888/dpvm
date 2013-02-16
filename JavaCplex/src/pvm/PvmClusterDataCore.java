@@ -29,9 +29,6 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         ArrayList<int[]> clusters = DatabaseLoader.loadClusters(clusterFileName);
         splitClustersAccordingToLabel(clusters);
         buildClustersTotal();
-        clustersCount = clustersTotal.size();
-        clusterSigmasPos = new double[clustersPos.size()];
-        clusterSigmasNeg = new double[clustersNeg.size()];
     }
 
     public void ReadFile(String fileName) throws IOException{
@@ -48,14 +45,28 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         clustersPos.add(xPos.clone());
         clustersNeg.add(xNeg.clone());
 
-        clustersTotal.clear();
-        clustersTotal.addAll(clustersPos);
-        clustersTotal.addAll(clustersNeg);
+        buildClustersTotal();
+    }
 
-        clustersCount = clustersTotal.size();
+    protected void buildIndividualClustersForEachElement(){
+        int i;
 
-        clusterSigmasPos = new double[1];
-        clusterSigmasNeg = new double[1];
+        clustersPos.clear();
+        clustersNeg.clear();
+
+        for (int idx : xPos){
+            int clst[] = new int[1];
+            clst[0] = idx;
+            clustersPos.add(clst);
+        }
+
+        for (int idx : xNeg){
+            int clst[] = new int[1];
+            clst[0] = idx;
+            clustersNeg.add(clst);
+        }
+
+        buildClustersTotal();
     }
 
     protected void buildKMeansClusters(double clustersRatio) throws Exception {
@@ -68,7 +79,7 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
 
         cCount = getEntriesListAndClustersCount(tempEntries, xNeg, clustersRatio);
         clustersNeg = new ArrayList<int[]>(cCount);
-        buildKMeansClustersForEntries(tempEntries, cCount, clustersPos);
+        buildKMeansClustersForEntries(tempEntries, cCount, clustersNeg);
 
         buildClustersTotal();
     }
@@ -96,6 +107,9 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
 
             for (j = 0; j < idxs.length; j++)
                 idxs[j] = entries.indexOf(retClusters.get(i).get(j));
+
+            if (idxs.length > 0)
+                dest.add(idxs);
         }
     }
 
@@ -107,6 +121,11 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         clustersTotal.addAll(clustersPos);
         clustersTotal.addAll(clustersNeg);
         clustersCount = clustersTotal.size();
+
+        if (clusterSigmasPos == null || clusterSigmasPos.length != clustersPos.size())
+            clusterSigmasPos = new double[clustersPos.size()];
+        if (clusterSigmasNeg == null || clusterSigmasNeg.length != clustersNeg.size())
+            clusterSigmasNeg = new double[clustersNeg.size()];
     }
 
     protected int getSingleClusterPositiveLabelCount(int cluster[]){
@@ -189,7 +208,7 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
         }
         else{
             offsetB = - (positiveTrainBias * clusterSigPos * ksumNeg + clusterSigNeg * ksumPos) / (positiveTrainBias * clusterSigPos + clusterSigNeg);
-            resT[0] = positiveTrainBias * sigPos / (ksumPos + offsetB);
+            resT[0] = positiveTrainBias * clusterSigPos / (ksumPos + offsetB);
         }
 
         ePos = ksumPos + offsetB;
@@ -305,7 +324,59 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
     @Override
     public PvmDataCore mergeCores(ArrayList<PvmDataCore> srcCores){
         PvmDataCore temp = super.mergeCores(srcCores);
-        return new PvmClusterDataCore(temp);
+        PvmClusterDataCore ret = new PvmClusterDataCore(temp);
+        ret.Init();
+        ret.inheritClusteringFrom(this);
+        return ret;
+    }
+
+    protected void inheritClusteringFrom(PvmClusterDataCore src){
+        int[] cCluster;
+
+        if (clustersPos == null || clustersNeg == null || clustersTotal == null)
+            allocClusters();
+
+        clustersPos.clear();
+        clustersNeg.clear();
+
+        for (int [] cluster : src.clustersPos){
+            cCluster = constructInheritedCluster(src.entries, cluster);
+            if (cCluster == null)
+                continue;
+            clustersPos.add(cCluster);
+        }
+
+        for (int [] cluster : src.clustersNeg){
+            cCluster = constructInheritedCluster(src.entries, cluster);
+            if (cCluster == null)
+                continue;
+            clustersNeg.add(cCluster);
+        }
+
+        buildClustersTotal();
+    }
+
+    protected int [] constructInheritedCluster(ArrayList<PvmEntry> srcEntries, int srcCluster[]){
+        int i, idx;
+        ArrayList<Integer> tempCluster = new ArrayList<Integer>(1);
+
+        tempCluster.clear();
+        for (i = 0; i < srcCluster.length; i++){
+            idx = entries.indexOf(srcEntries.get(srcCluster[i]));
+            if (idx < 0)
+                continue;
+
+            tempCluster.add(idx);
+        }
+
+        if (tempCluster.size() == 0)
+            return null;
+
+        int [] ncluster = new int[tempCluster.size()];
+        for (i = 0; i < tempCluster.size(); i++)
+            ncluster[i] = tempCluster.get(i);
+
+        return ncluster;
     }
 
     public void from(PvmDataCore other){
@@ -402,15 +473,7 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
                 splitCluster(i, false);
             }
 
-        clustersTotal.clear();
-        clustersTotal.addAll(clustersPos);
-        clustersTotal.addAll(clustersNeg);
-        clustersCount = clustersTotal.size();
-
-        if (originalClusterCount != clustersTotal.size()){
-            clusterSigmasPos = new double[clustersPos.size()];
-            clusterSigmasNeg = new double[clustersNeg.size()];
-        }
+        buildClustersTotal();
 
         return splitLeastOne;
     }
@@ -433,16 +496,7 @@ public class PvmClusterDataCore extends PvmDataCore implements Cloneable{
                 splitCluster(i, false);
         }
 
-        clustersTotal.clear();
-        clustersTotal.addAll(clustersPos);
-        clustersTotal.addAll(clustersNeg);
-        clustersCount = clustersTotal.size();
-
-        if (originalClusterCount != clustersTotal.size()){
-            clusterSigmasPos = new double[clustersPos.size()];
-            clusterSigmasNeg = new double[clustersNeg.size()];
-        }
-
+        buildClustersTotal();
 
         return originalClusterCount != clustersTotal.size();
     }

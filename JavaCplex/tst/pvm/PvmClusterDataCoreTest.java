@@ -24,6 +24,8 @@ public class PvmClusterDataCoreTest {
 
         for (i = 0; i < entriesCountPositive; i++)
             clusterDataCore.entries.get(i).label = true;
+
+        clusterDataCore.Init();
     }
 
     @Test
@@ -65,4 +67,30 @@ public class PvmClusterDataCoreTest {
                 clusterDataCore.clustersNeg.get(0)[0] == 1);
     }
 
+    @Test
+    public void test_constructInheritedCluster_ReturnsNullWhenNoEntriesReplicate(){
+        PvmClusterDataCore core = new PvmClusterDataCore(), tempCore = new PvmClusterDataCore();
+        addEntriesToPvmClusterDataCore(core, 4, 2);
+
+        tempCore.entries = new ArrayList<PvmEntry>(core.xNeg.length);
+        for (int i : core.xNeg)
+            tempCore.entries.add(core.entries.get(i));
+
+        int resCluster[] = tempCore.constructInheritedCluster(core.entries, core.xPos);
+        Assert.assertTrue(resCluster == null);
+    }
+
+    @Test
+    public void test_constructInheritedCluster_ReturnsOnlyEntriesIdxsStillExistent(){
+        PvmClusterDataCore core = new PvmClusterDataCore(), tempCore = new PvmClusterDataCore();
+        addEntriesToPvmClusterDataCore(core, 4, 2);
+
+        tempCore.entries = new ArrayList<PvmEntry>(core.xNeg.length);
+        tempCore.entries.add(core.entries.get(core.xPos[0]));
+
+        int []res = tempCore.constructInheritedCluster(core.entries, core.xPos);
+
+        Assert.assertTrue(res != null);
+        Assert.assertTrue(res.length == 1 && res[0] == 0);
+    }
 }
