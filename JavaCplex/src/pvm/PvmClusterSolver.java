@@ -42,12 +42,13 @@ public class PvmClusterSolver extends PvmSolver{
         double relativeObjective;
         double clusterObjective, nonClusteredObjective;
         double [] resT = new double[1];
-        int iterCount = 0, maxIterCount = clusterCore.entries.size();
+        int iterCount = 0, maxIterCount;
         int localIters, maxLocalIters = 10;
 
         if (core.getClass() == PvmClusterDataCore.class)
             clusterCore = (PvmClusterDataCore)core;
 
+        maxIterCount = core.entries.size();
         //clusterCore.Init();
 
         do{
