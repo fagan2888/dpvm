@@ -1,11 +1,18 @@
 package pvm;
 
+import dsolve.LocalSolver;
 import dsolve.SolverHelper;
 import ilog.concert.IloException;
+import ilog.concert.IloNumVar;
+import ilog.concert.IloObjective;
+import ilog.concert.IloRange;
+import ilog.cplex.IloCplex;
 import org.apache.commons.lang3.mutable.MutableDouble;
 import pvm.KernelProducts.KernelProductManager;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 
 /**
  * Created with IntelliJ IDEA.
@@ -35,6 +42,8 @@ public class PvmClusterSolver extends PvmSolver{
         double relativeObjective;
         double clusterObjective, nonClusteredObjective;
         double [] resT = new double[1];
+        int iterCount = 0, maxIterCount = clusterCore.entries.size();
+        int localIters, maxLocalIters = 10;
 
         if (core.getClass() == PvmClusterDataCore.class)
             clusterCore = (PvmClusterDataCore)core;
@@ -52,17 +61,24 @@ public class PvmClusterSolver extends PvmSolver{
             clusterObjective = clusterCore.computeClusteredObjectiveValue(positiveBias);
 
             if (clusterObjective + objectiveMinimalDifference < nonClusteredObjective * relativeObjectiveThresh){
-                while (!clusterCore.splitClustersDescendingAccordingToAberration(splitAberrationThresh))
+                localIters = 0;
+                while (!clusterCore.splitClustersDescendingAccordingToAberration(splitAberrationThresh) &&
+                        localIters < maxLocalIters){
+                    splitAberrationThresh *= relativeAberrationThreshDecayRate;
+                    localIters++;
+                }
+
                 /*while (!clusterCore.splitClustersWithAberrationOverThreshold(splitAberrationThresh) &&
                         splitAberrationThresh > relativeAberrationMinimalThresh)*/
-                    splitAberrationThresh *= relativeAberrationThreshDecayRate;
 
                 if (splitAberrationThresh <= relativeAberrationMinimalThresh)
                     splitAberrationThresh *= relativeAberrationThreshDecayRate;
             }
             else
                 break;
-        } while (true);
+
+            iterCount++;
+        } while (iterCount < maxIterCount);
 
         if (resT[0] == 0){
 

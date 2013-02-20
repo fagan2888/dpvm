@@ -71,8 +71,8 @@ public class FoldRunner {
         KernelProductManager.KerType kerType = KernelProductManager.getAvailableKernels()[Integer.valueOf(args[1])].getKerType();
 
         int i;
-        //PvmSolver solver = getNonClusterSolver(args[0]);
-        PvmSolver solver = getClusterSolver(args[0]);
+        PvmSolver solver = getNonClusterSolver(args[0]);
+        //PvmSolver solver = getClusterSolver(args[0]);
 
 
         KernelProductManager.setKernelTypeGlobal(kerType);
