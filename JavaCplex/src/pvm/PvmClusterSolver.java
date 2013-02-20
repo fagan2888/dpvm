@@ -1,12 +1,11 @@
 package pvm;
 
+import dsolve.SolverHelper;
 import ilog.concert.IloException;
-import ilog.concert.IloNumVar;
-import ilog.concert.IloObjective;
-import ilog.concert.IloRange;
-import ilog.cplex.IloCplex;
+import org.apache.commons.lang3.mutable.MutableDouble;
+import pvm.KernelProducts.KernelProductManager;
 
-import java.util.ArrayList;
+import java.net.URISyntaxException;
 
 /**
  * Created with IntelliJ IDEA.
@@ -78,8 +77,34 @@ public class PvmClusterSolver extends PvmSolver{
         return true;
     }
 
-    @Override
+	@Override
+	public int getClusterCount() {
+		return this.clusterCore.clustersCount;
+	}
+
+	@Override
     protected PvmSolver instantiateLocalSolver(){
         return new PvmClusterSolver();
     }
+
+	public static void main(String[] args ) throws Exception {
+
+		if (args.length < 1) return;
+
+		try { SolverHelper.dropNativeCplex(); } catch ( URISyntaxException ignored ) {}
+
+		PvmClusterSolver solver = new PvmClusterSolver();
+		PvmTrainParameters bestTrainParams = new PvmTrainParameters();
+		MutableDouble acc = new MutableDouble(0), sens = new MutableDouble(0), spec = new MutableDouble(0);
+
+		solver.clusterCore.ReadFile( args[0] );
+		solver.clusterCore.buildKMeansClusters( 0.05 );
+
+		KernelProductManager.KerType[] kernelTypes = new KernelProductManager.KerType[2];
+		kernelTypes[0] = KernelProductManager.KerType.KERSCALAR;
+		kernelTypes[1] = KernelProductManager.KerType.KERRBF;
+
+		solver.searchTrainParameters( 10, kernelTypes, bestTrainParams, acc, sens, spec );
+	}
+
 }

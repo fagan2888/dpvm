@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created with IntelliJ IDEA.
@@ -253,20 +254,25 @@ public class PvmSolver {
         accuracy[split] = (double)(tp + tn) / (double)(entries.size());
     }
 
-    public void performCrossFoldValidationWithBias(int splitCount, double positiveBias, boolean solvedFlags[], double accuracy[], double sensitivity[], double specificity[]) throws IloException {
+    public void performCrossFoldValidationWithBias(
+	    int     splitCount,
+	    double  positiveBias,
+	    boolean solvedFlags[],
+	    double accuracy[],
+	    double sensitivity[],
+	    double specificity[],
+        int    clusterCount[] ) throws IloException {
+
 	    core.Init( false );
         ArrayList<PvmDataCore> splitCores = core.splitRandomIntoSlices( splitCount );
 
         assert( splitCount == splitCores.size() );
         assert( accuracy.length > 0 && sensitivity.length > 0 && specificity.length > 0 );
 
-        //todo : replace with the actual multithreaded version from the final version
 	    ExecutorService executorService = Executors.newFixedThreadPool( splitCount );
-        //ExecutorService executorService = Executors.newFixedThreadPool( 1 );
 
 	    // spawn a thread pool and add each fold as a task
         for ( int i = 0; i < splitCount; i++ ) {
-        //for ( int i = 0; i < 1; i++ ) {
 
 	        accuracy[i]    = 0.0;
 	        sensitivity[i] = 0.0;
@@ -274,7 +280,7 @@ public class PvmSolver {
 	        solvedFlags[i] = false;
 
 	        SolverFoldRunnable foldRunnable = new SolverFoldRunnable( splitCores, core, i, positiveBias, this );
-	        foldRunnable.setResultVectors( accuracy, sensitivity, specificity, solvedFlags );
+	        foldRunnable.setResultVectors( accuracy, sensitivity, specificity, solvedFlags, clusterCount );
 
 	        executorService.submit( foldRunnable );
         }
@@ -289,8 +295,8 @@ public class PvmSolver {
 	    }
     }
 
-    public void performCrossFoldValidation(int splitCount, boolean solvedFlags[], double accuracy[], double sensitivity[], double specificity[]) throws IloException {
-        performCrossFoldValidationWithBias(splitCount, 1.0, solvedFlags, accuracy, sensitivity, specificity);
+    public void performCrossFoldValidation(int splitCount, boolean solvedFlags[], double accuracy[], double sensitivity[], double specificity[], int[] clusterCount) throws IloException {
+        performCrossFoldValidationWithBias(splitCount, 1.0, solvedFlags, accuracy, sensitivity, specificity, clusterCount);
     }
 
     public void writeNormalizedDistancesToFiles(String fileNamePos, String fileNameNeg) throws IloException, IOException {
@@ -316,7 +322,13 @@ public class PvmSolver {
         fw.close();
     }
 
-    public double searchPositiveTrainBias( int splitCount, MutableDouble accuracy, MutableDouble sensitivity, MutableDouble specificity ) throws IloException {
+    public double searchPositiveTrainBias(
+	    int splitCount,
+	    MutableDouble accuracy,
+	    MutableDouble sensitivity,
+	    MutableDouble specificity,
+	    AtomicInteger clusterCount ) throws IloException {
+
         int i;
         double cPow, maxCPow = 0, bestTrainBias = 1.0, trainBias;
         double bestAcc = 0.0;
@@ -324,6 +336,7 @@ public class PvmSolver {
         for (i = -MAX_POS_TRAIN_BIAS; i <= MAX_POS_TRAIN_BIAS; i++){
 
 	        double meanAcc = 0, meanSens = 0, meanSpec = 0;
+	        int meanClusterCount = 0;
             trainBias = Math.pow(2, (double)i);
 
 	        System.out.printf( "\t\tBIASPOW:2^%2d", i ); long start = System.currentTimeMillis();
@@ -332,15 +345,17 @@ public class PvmSolver {
 	        for ( int k=0; k<5; k++ ) {
 
 		        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
+		        int [] foldClusterCount = new int[splitCount];
 		        boolean foldSolvedFlags[] = new boolean[splitCount];
 
-	            performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+	            performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec, foldClusterCount );
 		        for ( int j=0; j<splitCount; j++ ) {
 			        if ( foldSolvedFlags[j] ) {
 				        solvesCount++;
 				        meanAcc  += foldAcc[j];
 				        meanSens += foldSens[j];
 				        meanSpec += foldSpec[j];
+				        meanClusterCount += foldClusterCount[j];
 			        }
 		        }
 	        }
@@ -349,11 +364,14 @@ public class PvmSolver {
 		        meanAcc  /= solvesCount;
 		        meanSens /= solvesCount;
 		        meanSpec /= solvesCount;
+		        meanClusterCount /= solvesCount;
 	        }
 
 	        System.out.printf(
-		        "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d\n",
-				meanAcc,meanSens,meanSpec, (System.currentTimeMillis()-start)/1000
+		        "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d/CC:%d\n",
+				meanAcc,meanSens,meanSpec,
+		        (System.currentTimeMillis()-start)/1000,
+		        meanClusterCount
 	        );
 
             if ( bestAcc < meanAcc ) {
@@ -364,6 +382,7 @@ public class PvmSolver {
                 accuracy.setValue( meanAcc );
                 sensitivity.setValue( meanSens );
                 specificity.setValue( meanSpec );
+	            clusterCount.set( meanClusterCount );
             }
         }
 
@@ -371,7 +390,7 @@ public class PvmSolver {
         for ( cPow = maxCPow - 2; cPow < maxCPow; cPow += 0.2 ) {
 
 	        double meanAcc = 0, meanSens = 0, meanSpec = 0;
-
+	        int meanClusterCount = 0;
             trainBias = Math.pow( 2, cPow );
 
             System.out.print( String.format( "\t\tBIASPOW:2^%.2f", cPow ) ); long start = System.currentTimeMillis();
@@ -380,8 +399,9 @@ public class PvmSolver {
 	        for ( int k=0; k<3; k++ ) {
 		        boolean foldSolvedFlags[] = new boolean[splitCount];
 		        double foldAcc[] = new double[splitCount], foldSens[] = new double[splitCount], foldSpec[] = new double[splitCount];
+		        int foldClusterCount[] = new int[splitCount];
 
-		        performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+		        performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec, foldClusterCount );
 
 		        for ( int j=0; j<splitCount; j++ ) {
 
@@ -390,6 +410,7 @@ public class PvmSolver {
 				        meanAcc  += foldAcc[j];
 				        meanSens += foldSens[j];
 				        meanSpec += foldSpec[j];
+				        meanClusterCount += foldClusterCount[j];
 			        }
 		        }
 	        }
@@ -398,11 +419,12 @@ public class PvmSolver {
 		        meanAcc  /= solvesCount;
 		        meanSens /= solvesCount;
 		        meanSpec /= solvesCount;
+		        meanClusterCount /= solvesCount;
 	        }
 
 	        System.out.printf(
-		        "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d\n",
-		        meanAcc, meanSens, meanSpec, ( System.currentTimeMillis() - start ) / 1000
+		        "/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d/CC:%d\n",
+		        meanAcc, meanSens, meanSpec, ( System.currentTimeMillis() - start ) / 1000, meanClusterCount
 	        );
 
 	        if ( bestAcc < meanAcc ) {
@@ -412,6 +434,7 @@ public class PvmSolver {
 		        accuracy.setValue( meanAcc );
 		        sensitivity.setValue( meanSens );
 		        specificity.setValue( meanSpec );
+		        clusterCount.set( meanClusterCount );
 	        }
         }
 
@@ -426,6 +449,8 @@ public class PvmSolver {
 		    throws IloException, CloneNotSupportedException {
 
         MutableDouble tempAccuracy = new MutableDouble(0), tempSensitivity = new MutableDouble(0), tempSpecificity = new MutableDouble(0);
+	    AtomicInteger tempClusterCount = new AtomicInteger( 0 );
+
         double boundDLow, boundDHigh;
         int boundILow, boundIHigh;
         int paramIntItMax, paramDoubleItMax;
@@ -455,11 +480,15 @@ public class PvmSolver {
 	            long start = System.currentTimeMillis();
 
 	            // do the actual search
-                tempParams.trainBias = searchPositiveTrainBias(splitCount, tempAccuracy, tempSensitivity, tempSpecificity);
+                tempParams.trainBias = searchPositiveTrainBias(splitCount, tempAccuracy, tempSensitivity, tempSpecificity, tempClusterCount);
 
 	            System.out.printf(
-		            "\tEVALUATED ->%s/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%d\n",
-		            tempParams,tempAccuracy.doubleValue(),tempSensitivity.doubleValue(),tempSpecificity.doubleValue(),(System.currentTimeMillis()-start)/1000
+		            "\tEVALUATED ->%s/ACC:%.05f/SENS:%.05f/SPEC:%.05f/TIME:%dsec/CC:%d\n",
+		            tempParams,tempAccuracy.doubleValue(),
+		            tempSensitivity.doubleValue(),
+		            tempSpecificity.doubleValue(),
+		            (System.currentTimeMillis()-start)/1000,
+		            tempClusterCount.intValue()
 	            );
 
                 tempParams.accuracy = tempAccuracy.doubleValue();
@@ -533,6 +562,10 @@ public class PvmSolver {
         return new PvmSolver();
     }
 
+	public int getClusterCount() {
+		return this.core.entries.size();
+	}
+
 	private class SolverFoldRunnable implements Runnable {
 
 		ArrayList<PvmDataCore> splitCores;
@@ -545,6 +578,7 @@ public class PvmSolver {
 		double sensitivity[];
 		double specificity[];
 		boolean solvedFlags[];
+		int clusterCount[];
 
 		double positiveBias = 0;
 		int    split = -1;
@@ -557,11 +591,18 @@ public class PvmSolver {
             this.parent = parent;
 		}
 
-		public void setResultVectors( double accuracy[], double sensitivity[], double specificity[], boolean solvedFlags[] ) {
+		public void setResultVectors(
+			double accuracy[],
+			double sensitivity[],
+			double specificity[],
+			boolean solvedFlags[],
+			int clusterCount[] ) {
+
 			this.accuracy    = accuracy;
 			this.sensitivity = sensitivity;
 			this.specificity = specificity;
 			this.solvedFlags = solvedFlags;
+			this.clusterCount = clusterCount;
 		}
 
 		@Override
@@ -587,6 +628,7 @@ public class PvmSolver {
 				}
 				boolean localLabels[] = localSlv.classify( testCore.entries );
 				PvmSolver.computeAccuracy( localLabels, testCore.entries, accuracy, sensitivity, specificity, split );
+				clusterCount[split] = localSlv.getClusterCount();
 
 			} catch ( IloException e ) {
 				e.printStackTrace();
@@ -594,7 +636,7 @@ public class PvmSolver {
 		}
 	}
 
-	public static void main(String[] args ) throws IOException, IloException, LocalSolver.LocalSolverInputException, CloneNotSupportedException {
+	public static void main(String[] args ) throws Exception {
 
         if (args.length < 1) return;
 

@@ -21,6 +21,8 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
     public double sensitivity = 0;
     public double specificity = 0;
 
+	public int clusterCount = 0;
+
     @Override
     protected Object clone() throws CloneNotSupportedException {
 	    super.clone();
@@ -34,6 +36,7 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
         ret.accuracy = accuracy;
         ret.sensitivity = sensitivity;
         ret.specificity = specificity;
+	    ret.clusterCount = clusterCount;
 
         return ret;
     }
@@ -47,6 +50,8 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
 		this.accuracy = other.accuracy;
 		this.sensitivity = other.sensitivity;
 		this.specificity = other.specificity;
+
+		this.clusterCount = other.clusterCount;
 	}
 
     @Override
@@ -76,13 +81,15 @@ public class PvmTrainParameters implements Cloneable, Comparator<PvmTrainParamet
 
 	@Override
 	public String toString() {
-		return "KTYPE:" + kerType.name() + "/PINT:" + paramInt + "/PDBL:" + paramDouble + "/BIAS:" + trainBias;
+		return "KTYPE:" + kerType.name() +
+			"/PINT:" + paramInt + "/PDBL:" + paramDouble +
+			"/BIAS:" + trainBias + "/CC:" + clusterCount;
 	}
 
 	public String toCompleteString() {
 		return toString()+ String.format(
-			"/ACC:%.05f/SENS:%.05f/SPEC:%.05f",
-			accuracy, sensitivity, specificity
+			"/ACC:%.05f/SENS:%.05f/SPEC:%.05f/CC:%03d",
+			accuracy, sensitivity, specificity, clusterCount
 		);
 	}
 }

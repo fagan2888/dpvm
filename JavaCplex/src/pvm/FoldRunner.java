@@ -2,7 +2,6 @@ package pvm;
 
 import dsolve.LocalSolver;
 import dsolve.SolverHelper;
-import ilog.concert.IloException;
 import pvm.KernelProducts.KernelProductManager;
 
 import java.io.IOException;
@@ -89,11 +88,12 @@ public class FoldRunner {
         double foldSens[] = new double[ splitCount ];
         double foldSpec[] = new double[ splitCount ];
 	    boolean foldSolvedFlags [] = new boolean[ splitCount ];
+	    int clusterCount[] = new int[ splitCount ];
 
 	    // perform runs
         for (i = 0; i < runCount; i++){
 
-            solver.performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec );
+            solver.performCrossFoldValidationWithBias( splitCount, trainBias, foldSolvedFlags, foldAcc, foldSens, foldSpec, clusterCount );
 
 	        double foldMeanAcc = 0, foldMeanSens = 0, foldMeanSpec = 0;
 	        double foldSolveCount = 0.0;
