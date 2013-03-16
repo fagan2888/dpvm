@@ -12,6 +12,7 @@ import org.apache.commons.lang3.Validate;
 public class KernelProductRbf extends KernelProduct{
 
     double gamma = 1.0;
+    double offset = 0.0;
 
     static double gammaInitialSearchCenter = Math.pow(2, -6);
     static double gammaInitialPowerRange = 14;
@@ -35,9 +36,11 @@ public class KernelProductRbf extends KernelProduct{
 
         ret *= -gamma;
 
-        return Math.exp(ret);
+        return Math.exp(ret - offset);
     }
-    public void setParamInt(int paramInt){return;}
+    public void setParamInt(int paramInt){
+        offset = (double)paramInt / 1000;
+    }
     public void setParamDouble(double paramDouble){
         Validate.isTrue(paramDouble > 0, "The gamma value for the RBF kernel should always be positive");
         gamma = paramDouble;

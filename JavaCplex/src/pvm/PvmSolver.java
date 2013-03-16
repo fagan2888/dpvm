@@ -111,7 +111,8 @@ public class PvmSolver {
         double [] resT = new double[1];
 
         core.Init();
-        pvmSys.buildSingleLPSystem(core, false, false, false);
+        //pvmSys.buildSingleLPSystem(core, false, false, false);
+        pvmSys.buildSingleLPSystem(core, true, false, false);
         ret = pvmSys.solveSingleLP(resT);
 
         if (ret && resT[0] == 0.0)
@@ -648,10 +649,35 @@ public class PvmSolver {
 
         solver.core.ReadFile( args[0] );
 
-		KernelProductManager.KerType[] kernelTypes = new KernelProductManager.KerType[2];
-		kernelTypes[0] = KernelProductManager.KerType.KERSCALAR;
-		kernelTypes[1] = KernelProductManager.KerType.KERRBF;
+        KernelProductManager.setKernelTypeGlobal(KernelProductManager.KerType.KERRBF);
+        KernelProductManager.setParamInt(0);
+        KernelProductManager.setParamDouble(20);
 
-        solver.searchTrainParameters( 10, kernelTypes, bestTrainParams, acc, sens, spec );
+        solver.core.Init();
+
+
+        int i, j, idxP, idxN;
+        double maxDiff = 0, tempDiff;
+
+        for (i = 0; i < solver.core.xPos.length; i++){
+
+            for (j = 0; j < solver.core.xNeg.length; j++){
+                tempDiff = Math.abs(solver.core.gramMtx[solver.core.xPos[i]][solver.core.xNeg[j]] -
+                        solver.core.gramMtx[solver.core.xPos[j]][solver.core.xNeg[i]]);
+
+                if (maxDiff < tempDiff)
+                    maxDiff = tempDiff;
+            }
+
+            for (j = 0; j < solver.core.xPos.length; j++){
+                tempDiff = Math.abs(solver.core.gramMtx[solver.core.xPos[i]][solver.core.xPos[j]] -
+                                    solver.core.gramMtx[solver.core.xNeg[i]][solver.core.xNeg[j]]);
+
+                if (maxDiff < tempDiff)
+                    maxDiff = tempDiff;
+            }
+        }
+
+        solver.TrainSingleLP();
     }
 }

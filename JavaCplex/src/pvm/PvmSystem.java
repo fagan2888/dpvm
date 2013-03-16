@@ -914,7 +914,7 @@ public class PvmSystem {
         if ( !verbalize ) { cplex.setOut(null); }
 
 	    cplex.setParam( IloCplex.BooleanParam.NumericalEmphasis, true );
-	    cplex.setParam( IloCplex.IntParam.Threads, 4 );
+	    cplex.setParam( IloCplex.IntParam.Threads, 1 );
 	    //cplex.setParam( IloCplex.IntParam.ParallelMode, IloCplex.ParallelMode.Deterministic );
 
 	    //cplex.setParam( IloCplex.IntParam.RootAlg, IloCplex.Algorithm.Dual );
